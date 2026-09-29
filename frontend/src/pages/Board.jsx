@@ -3,10 +3,12 @@ import { io } from 'socket.io-client';
 import { Users, PlayCircle, UserCheck, CheckCircle2, Clock, Loader2, Sparkles } from 'lucide-react';
 import MacBackground from '../components/MacBackground';
 import MacWindow from '../components/MacWindow';
+import { useOrgConfig } from '../orgConfig';
 
 export default function Board({ hideHeader, department, isAdmin, onRemoveCandidate }) {
   const [boardData, setBoardData] = useState({ waiting: [], interviewing: [], completed: [] });
   const [contextMenu, setContextMenu] = useState(null); // { x, y, candidate }
+  const { getCandidateName } = useOrgConfig();
 
   // Close context menu on any click
   React.useEffect(() => {
@@ -66,7 +68,7 @@ export default function Board({ hideHeader, department, isAdmin, onRemoveCandida
                   onContextMenu={isAdmin ? (e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, candidate: c }); } : undefined}
                 >
                   <div className="flex justify-between items-start mb-2">
-                    <span className={`font-black text-xl tracking-tight ${c.status === 'moving' ? 'text-orange-900' : 'text-slate-700'}`}>{c.applicationData?.['Họ và tên'] || c.interviewCode}</span>
+                    <span className={`font-black text-xl tracking-tight ${c.status === 'moving' ? 'text-orange-900' : 'text-slate-700'}`}>{getCandidateName(c) || c.interviewCode}</span>
                     {c.status === 'moving' && <span className="flex h-4 w-4 relative"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-500 opacity-75"></span><span className="relative inline-flex rounded-full h-4 w-4 bg-orange-600"></span></span>}
                   </div>
                   <div className="flex items-center gap-2 text-sm font-medium text-slate-500 mb-2">
@@ -102,7 +104,7 @@ export default function Board({ hideHeader, department, isAdmin, onRemoveCandida
               ) : boardData.interviewing.map(c => (
                 <div key={c.interviewCode} className="p-5 bg-white/90 rounded-2xl border border-white shadow-sm hover:shadow-md flex flex-col gap-3 relative overflow-hidden group transition-all">
                   <div className="absolute top-0 right-0 w-20 h-20 bg-blue-50/50 rounded-bl-full -z-10 group-hover:scale-150 transition-transform duration-500"></div>
-                  <div className="font-black text-xl text-slate-800 tracking-tight">{c.applicationData?.['Họ và tên'] || c.interviewCode}</div>
+                  <div className="font-black text-xl text-slate-800 tracking-tight">{getCandidateName(c) || c.interviewCode}</div>
                   <div className="text-sm font-bold text-blue-700 bg-blue-50/80 py-2 px-4 rounded-xl inline-flex items-center gap-2 w-fit border border-blue-100 shadow-sm">
                     Bàn phỏng vấn: <span className="text-xl font-black text-blue-800">{c.assignedTable}</span>
                   </div>
@@ -125,7 +127,7 @@ export default function Board({ hideHeader, department, isAdmin, onRemoveCandida
                 <div className="h-full flex flex-col items-center justify-center text-slate-400 italic font-medium">Trống</div>
               ) : boardData.completed.map(c => (
                 <div key={c.interviewCode} className="p-5 bg-white/60 backdrop-blur-md rounded-2xl border border-white shadow-sm opacity-90 flex items-center justify-between hover:opacity-100 hover:shadow-md transition-all">
-                  <span className="font-black text-lg text-slate-600 tracking-tight">{c.applicationData?.['Họ và tên'] || c.interviewCode}</span>
+                  <span className="font-black text-lg text-slate-600 tracking-tight">{getCandidateName(c) || c.interviewCode}</span>
                   <span className="text-emerald-500 bg-emerald-50 p-2 rounded-xl">
                     <CheckCircle2 size={20} />
                   </span>
@@ -145,7 +147,7 @@ export default function Board({ hideHeader, department, isAdmin, onRemoveCandida
           onClick={(e) => e.stopPropagation()}
         >
           <div className="px-4 py-2 text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">
-            {contextMenu.candidate.applicationData?.['Họ và tên'] || contextMenu.candidate.interviewCode}
+            {getCandidateName(contextMenu.candidate) || contextMenu.candidate.interviewCode}
           </div>
           <button
             onClick={() => {

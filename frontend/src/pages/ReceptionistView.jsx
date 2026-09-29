@@ -8,9 +8,11 @@ import Board from './Board';
 import ChatWidget from '../components/ChatWidget';
 import MacBackground from '../components/MacBackground';
 import MacWindow from '../components/MacWindow';
+import { useOrgConfig } from '../orgConfig';
 
 export default function ReceptionistView() {
   const navigate = useNavigate();
+  const { departments, defaultDepartment, codeLabel, config, deptShortName, inDepartment, getCandidateName, getCandidatePhone } = useOrgConfig();
   const handleLogout = () => {
     localStorage.removeItem('user');
     navigate('/');
@@ -67,7 +69,7 @@ export default function ReceptionistView() {
 
   const [user, setUser] = React.useState(() => JSON.parse(localStorage.getItem('user')) || {});
   const [isLoaded, setIsLoaded] = React.useState(false);
-  const viewDepartment = user.department || 'TCKT';
+  const viewDepartment = user.department || defaultDepartment;
 
   useEffect(() => {
     const stored = JSON.parse(localStorage.getItem('user'));
@@ -107,10 +109,9 @@ export default function ReceptionistView() {
     const { value: formValues } = await Swal.fire({
       title: 'Check-in ứng viên',
       html: `
-        <input id="swal-input-mssv" class="swal2-input" placeholder="Nhập MSSV (hoặc Mã PV)..." style="text-transform: uppercase;">
+        <input id="swal-input-mssv" class="swal2-input" placeholder="Nhập ${codeLabel}..." style="text-transform: uppercase;">
         <select id="swal-input-dept" class="swal2-select" style="display:flex; width: 80%; margin: 1em auto; font-size: 1.1em;">
-          <option value="TCKT" ${viewDepartment === 'TCKT' ? 'selected' : ''}>Ban Tổ chức - Kiểm tra (TCKT)</option>
-          <option value="BCS" ${viewDepartment === 'BCS' ? 'selected' : ''}>Ban Cán sự (BCS)</option>
+          ${departments.map(d => `<option value="${d.code}" ${viewDepartment === d.code ? 'selected' : ''}>${d.name} (${d.code})</option>`).join('')}
         </select>
       `,
       focusConfirm: false,
@@ -121,7 +122,7 @@ export default function ReceptionistView() {
         const mssv = document.getElementById('swal-input-mssv').value;
         const dept = document.getElementById('swal-input-dept').value;
         if (!mssv) {
-          Swal.showValidationMessage('Vui lòng nhập MSSV');
+          Swal.showValidationMessage(`Vui lòng nhập ${codeLabel}`);
           return false;
         }
         return { mssv: mssv.trim().toUpperCase(), dept };
@@ -166,7 +167,7 @@ export default function ReceptionistView() {
     }
   };
 
-  const filteredCandidates = candidates.filter(c => c.department === viewDepartment || (!c.department && viewDepartment === 'TCKT'));
+  const filteredCandidates = candidates.filter(c => inDepartment(c, viewDepartment));
 
   useEffect(() => {
     if (isLoaded && (!user.username || user.role !== 'receptionist')) {
@@ -181,7 +182,7 @@ export default function ReceptionistView() {
     <div className="min-h-screen relative overflow-hidden p-4 md:p-8 font-sans flex flex-col items-center">
       <MacBackground />
 
-      <MacWindow title={`Lễ Tân Dashboard - ${user.fullName || user.username} (${viewDepartment})`} className="w-full max-w-[1600px] flex-1" contentClassName="p-0 flex flex-col h-full">
+      <MacWindow title={`Lễ Tân Dashboard - ${user.fullName || user.username} (${deptShortName(viewDepartment)})`} className="w-full max-w-[1600px] flex-1" contentClassName="p-0 flex flex-col h-full">
         {/* Navigation Tabs */}
         <div className="bg-slate-800 text-white p-4 flex flex-col md:flex-row justify-between items-center gap-4 shadow-md shrink-0">
           <div className="flex items-center gap-4">
@@ -244,15 +245,15 @@ export default function ReceptionistView() {
 
           {activeTab === 'candidates' && (
             <div className="bg-white/80 backdrop-blur-md rounded-[2rem] shadow-xl border border-white/50 p-8 animate-fade-in-up">
-              <h2 className="text-3xl font-black text-slate-800 tracking-tight mb-8 border-b border-slate-100 pb-6">Danh Sách Ứng Viên ({viewDepartment})</h2>
+              <h2 className="text-3xl font-black text-slate-800 tracking-tight mb-8 border-b border-slate-100 pb-6">Danh Sách Ứng Viên ({deptShortName(viewDepartment)})</h2>
               
               {/* Add New Candidate */}
               <div className="bg-slate-50 border border-slate-200 p-6 rounded-2xl mb-8">
                 <h3 className="text-lg font-bold text-slate-700 mb-4">Thêm ứng viên bổ sung</h3>
                 <form onSubmit={handleAddCandidate} className="flex flex-wrap gap-4 items-end">
                   <div className="flex-1 min-w-[200px]">
-                    <label className="block text-sm font-bold text-slate-600 mb-1">Mã Ứng Viên (MSSV)</label>
-                    <input type="text" value={newCandidate.interviewCode} onChange={e => setNewCandidate({...newCandidate, interviewCode: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-blue-500 bg-white" placeholder="vd: 202513118" />
+                    <label className="block text-sm font-bold text-slate-600 mb-1">Mã Ứng Viên ({codeLabel})</label>
+                    <input type="text" value={newCandidate.interviewCode} onChange={e => setNewCandidate({...newCandidate, interviewCode: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-blue-500 bg-white" placeholder={config.candidate.codePlaceholder || ''} />
                   </div>
                   <div className="flex-1 min-w-[200px]">
                     <label className="block text-sm font-bold text-slate-600 mb-1">Họ và Tên</label>
@@ -268,7 +269,7 @@ export default function ReceptionistView() {
                     <tr className="bg-slate-100 text-slate-600 uppercase text-xs tracking-wider">
                       <th className="p-4 rounded-tl-xl font-black">STT</th>
                       <th className="p-4 font-black">Họ và Tên</th>
-                      <th className="p-4 font-black">Mã Sinh Viên</th>
+                      <th className="p-4 font-black">{codeLabel}</th>
                       <th className="p-4 font-black">Số Điện Thoại</th>
                       <th className="p-4 font-black">Trạng Thái</th>
                       <th className="p-4 rounded-tr-xl font-black text-center">Bàn Phỏng Vấn</th>
@@ -278,9 +279,9 @@ export default function ReceptionistView() {
                     {filteredCandidates.map((c, index) => (
                       <tr key={c._id} className="border-b border-slate-100 hover:bg-white/60 transition-colors">
                         <td className="p-4 font-bold text-slate-500 text-center">{index + 1}</td>
-                        <td className="p-4 font-bold text-slate-800">{c.applicationData?.['Họ và tên'] || c.applicationData?.['Họ tên'] || c.applicationData?.['fullName'] || '-'}</td>
+                        <td className="p-4 font-bold text-slate-800">{getCandidateName(c) || '-'}</td>
                         <td className="p-4 font-medium text-slate-600">{c.interviewCode}</td>
-                        <td className="p-4 font-medium text-slate-600">{c.applicationData?.['Điện thoại'] || c.applicationData?.['Số điện thoại'] || '-'}</td>
+                        <td className="p-4 font-medium text-slate-600">{getCandidatePhone(c) || '-'}</td>
                         <td className="p-4">
                           <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                             c.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :

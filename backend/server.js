@@ -10,6 +10,7 @@ const Candidate = require('./models/Candidate');
 const User = require('./models/User');
 const Evaluation = require('./models/Evaluation');
 const Message = require('./models/Message');
+const { config: orgConfig, ASSETS_DIR, defaultDepartment, isValidDepartment, isValidResult, getCandidateName } = require('./config');
 
 const app = express();
 app.use(cors());
@@ -20,7 +21,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'tckt_super_secret_key';
 
 const authMiddleware = async (req, res, next) => {
   // Allow public/read-only routes without token
-  if (req.path === '/login' || req.path === '/tv-board' || req.path === '/board') return next();
+  if (req.path === '/login' || req.path === '/tv-board' || req.path === '/board' || req.path === '/public/config') return next();
   
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -34,12 +35,7 @@ const authMiddleware = async (req, res, next) => {
     // For sensitive Admin routes, check DB for live roles and hardcoded names
     if (req.path.startsWith('/admin')) {
        const dbUser = await User.findById(req.user.id);
-       const isAdmin = dbUser && (
-         dbUser.role === 'admin' || 
-         (dbUser.roles && dbUser.roles.includes('admin')) || 
-         dbUser.fullName === 'Phạm Việt Bách' || 
-         dbUser.username === 'Phạm Việt Bách'
-       );
+       const isAdmin = dbUser && (dbUser.role === 'admin' || (dbUser.roles && dbUser.roles.includes('admin')));
        if (!isAdmin) {
          return res.status(403).json({ success: false, message: 'Forbidden: Admins only' });
        }
@@ -51,6 +47,13 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 app.use('/api', authMiddleware);
+
+// Org-specific branding assets (logos, backgrounds, QR...) live next to the org config
+app.use('/org-assets', express.static(ASSETS_DIR));
+
+app.get('/api/public/config', (req, res) => {
+  res.json(orgConfig);
+});
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -140,7 +143,7 @@ io.on('connection', (socket) => {
       
       let candidate = await Candidate.findOne(query);
       if (!candidate) {
-        candidate = new Candidate({ interviewCode: data.interviewCode, department: data.department || 'TCKT' });
+        candidate = new Candidate({ interviewCode: data.interviewCode, department: data.department || defaultDepartment });
       }
       if (candidate.status === 'active' || !candidate.status) {
         candidate.status = 'waiting';
@@ -272,10 +275,9 @@ app.get('/api/tv-board', async (req, res) => {
     department: 1,
     assignedRoom: 1,
     assignedTable: 1,
-    'applicationData.Họ và tên': 1,
-    'applicationData.Họ tên': 1,
     checkInTime: 1
   };
+  orgConfig.candidate.nameFields.forEach(f => { fields[`applicationData.${f}`] = 1; });
   const waiting = await Candidate.find({ status: 'waiting', ...filter }).select(fields).sort({ checkInTime: 1 }).lean();
   const moving = await Candidate.find({ status: 'moving', ...filter }).select(fields).lean();
   const interviewing = await Candidate.find({ status: 'interviewing', ...filter }).select(fields).lean();
@@ -283,10 +285,20 @@ app.get('/api/tv-board', async (req, res) => {
 });
 
 app.post('/api/evaluation', async (req, res) => {
-  const { interviewCode, department, interviewerUsername, attitudeScore, skillScore, problemSolvingScore, notes, result } = req.body;
+  const { interviewCode, department, interviewerUsername, scores, notes, result } = req.body;
   try {
+    if (!isValidResult(result)) return res.status(400).json({ success: false, message: 'Kết quả đánh giá không hợp lệ' });
+    const scoreList = [];
+    for (const c of orgConfig.evaluation.criteria) {
+      const score = Number(scores && scores[c.key]);
+      if (!Number.isFinite(score) || score < c.min || score > c.max) {
+        return res.status(400).json({ success: false, message: `Điểm "${c.label}" phải từ ${c.min} đến ${c.max}` });
+      }
+      scoreList.push({ key: c.key, label: c.label, score });
+    }
+    const averageScore = Math.round(scoreList.reduce((a, s) => a + s.score, 0) / scoreList.length * 10) / 10;
     const evaluation = new Evaluation({
-      interviewCode, department, interviewerUsername, attitudeScore, skillScore, problemSolvingScore, notes, result
+      interviewCode, department, interviewerUsername, scores: scoreList, averageScore, notes, result
     });
     await evaluation.save();
 
@@ -397,14 +409,13 @@ app.get('/api/evaluations', async (req, res) => {
     const [evals, candidates, users] = await Promise.all([
       Evaluation.find(evalFilter).sort({ createdAt: -1 }).lean(),
       // Only fetch the fields needed for name lookup, skip heavy applicationData
-      Candidate.find(candidateFilter).select('interviewCode applicationData.Họ và tên applicationData.Họ tên applicationData.fullName').lean(),
+      Candidate.find(candidateFilter).select(['interviewCode', ...orgConfig.candidate.nameFields.map(f => `applicationData.${f}`)]).lean(),
       User.find().select('username fullName').lean()
     ]);
 
     const candidateMap = {};
     candidates.forEach(c => {
-      const d = c.applicationData || {};
-      candidateMap[c.interviewCode] = d['Họ và tên'] || d['Họ tên'] || d['fullName'] || c.interviewCode;
+      candidateMap[c.interviewCode] = getCandidateName(c) || c.interviewCode;
     });
 
     const userMap = {};
@@ -448,12 +459,7 @@ app.post('/api/messages', async (req, res) => {
     // Group chat requires admin privileges
     if (receiver.startsWith('group')) {
       const user = await User.findOne({ username: sender });
-      const isAdmin = user && (
-        user.role === 'admin' || 
-        (user.roles && user.roles.includes('admin')) || 
-        user.fullName === 'Phạm Việt Bách' || 
-        user.username === 'Phạm Việt Bách'
-      );
+      const isAdmin = user && (user.role === 'admin' || (user.roles && user.roles.includes('admin')));
       if (!isAdmin) {
         return res.status(403).json({ error: 'Only admins can send group messages' });
       }
@@ -631,7 +637,10 @@ app.post('/api/users/update', async (req, res) => {
       else if (roles.includes('receptionist')) u.role = 'receptionist';
       else if (roles.includes('interviewer')) u.role = 'interviewer';
     }
-    if (department) u.department = department;
+    if (department) {
+      if (!isValidDepartment(department)) return res.status(400).json({ success: false, error: 'Ban không hợp lệ' });
+      u.department = department;
+    }
     await u.save();
   }
   res.json({ success: true });
@@ -641,6 +650,7 @@ app.post('/api/users/add', async (req, res) => {
   try {
     const { username, fullName, department, roles } = req.body;
     if (!username) return res.status(400).json({ error: "Thiếu username" });
+    if (department && !isValidDepartment(department)) return res.status(400).json({ error: "Ban không hợp lệ" });
     
     let u = await User.findOne({ username });
     if (u) return res.status(400).json({ error: "Tài khoản đã tồn tại" });
@@ -648,7 +658,7 @@ app.post('/api/users/add', async (req, res) => {
     u = new User({
       username,
       fullName: fullName || username,
-      department: department || "TCKT",
+      department: department || defaultDepartment,
       roles: roles || ["interviewer"],
       role: (roles && roles.length > 0) ? roles[0] : "interviewer"
     });
@@ -721,17 +731,19 @@ app.post('/api/candidates/checkin', async (req, res) => {
 
 app.post('/api/candidates/add', async (req, res) => {
     try {
-      const { interviewCode, fullName, department } = req.body;
+      const { interviewCode, fullName } = req.body;
+      const department = req.body.department || defaultDepartment;
       if (!interviewCode) return res.status(400).json({ error: "Thiếu Mã Ứng Viên" });
+      if (!isValidDepartment(department)) return res.status(400).json({ error: "Ban không hợp lệ" });
       
-      let candidate = await Candidate.findOne({ interviewCode, department: department || "TCKT" });
-      if (candidate) return res.status(400).json({ error: `Mã Ứng Viên đã tồn tại trong ban ${department || "TCKT"}` });
+      let candidate = await Candidate.findOne({ interviewCode, department });
+      if (candidate) return res.status(400).json({ error: `Mã Ứng Viên đã tồn tại trong ban ${department}` });
     
     candidate = new Candidate({
       interviewCode,
-      department: department || "TCKT",
+      department,
       status: "active",
-      applicationData: { "Họ và tên": fullName || "" }
+      applicationData: { [orgConfig.candidate.nameFields[0]]: fullName || "" }
     });
     
     await candidate.save();

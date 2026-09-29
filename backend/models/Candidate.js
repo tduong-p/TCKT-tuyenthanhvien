@@ -1,8 +1,9 @@
 const mongoose = require('mongoose');
+const { defaultDepartment } = require('../config');
 
 const candidateSchema = new mongoose.Schema({
   interviewCode: { type: String, required: true },
-  department: { type: String, enum: ['TCKT', 'BCS'], default: 'TCKT' },
+  department: { type: String, default: defaultDepartment }, // validated against org config in routes
   status: { 
     type: String, 
     enum: ['active', 'waiting', 'moving', 'interviewing', 'completed'], 

@@ -5,9 +5,12 @@ import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { Coffee, User, CheckCircle, Save, MessageSquare, UserCheck, Loader2, RefreshCw, Hand, X, XCircle, LogOut } from 'lucide-react';
 import ChatWidget from '../components/ChatWidget';
+import { useOrgConfig } from '../orgConfig';
 
 export default function InterviewerView() {
   const navigate = useNavigate();
+  const { config, criteria, results, getCandidateName } = useOrgConfig();
+  const defaultScores = () => Object.fromEntries(criteria.map(c => [c.key, c.default]));
   const handleLogout = () => {
     localStorage.removeItem('user');
     navigate('/');
@@ -63,11 +66,9 @@ export default function InterviewerView() {
   const socketRef = useRef(null);
 
   // Form states
-  const [attitude, setAttitude] = useState(5);
-  const [skill, setSkill] = useState(5);
-  const [problemSolving, setProblemSolving] = useState(5);
+  const [scores, setScores] = useState(defaultScores);
   const [notes, setNotes] = useState('');
-  const [result, setResult] = useState('Đạt');
+  const [result, setResult] = useState(results[0].value);
   const [boardData, setBoardData] = useState({ waiting: [], interviewing: [], completed: [] });
   const [showQueueModal, setShowQueueModal] = useState(false);
   const [autoAssign, setAutoAssign] = useState(false);
@@ -225,20 +226,22 @@ export default function InterviewerView() {
       interviewCode: currentCandidate.interviewCode,
       department: currentCandidate.department || user.department,
       interviewerUsername: user.username,
-      attitudeScore: attitude,
-      skillScore: skill,
-      problemSolvingScore: problemSolving,
+      scores,
       notes,
       result
     };
     
-    await fetch('/api/evaluation', {
+    const res = await fetch('/api/evaluation', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return toast.error(err.message || 'Lỗi khi lưu đánh giá');
+    }
 
-    setAttitude(5); setSkill(5); setProblemSolving(5); setNotes(''); setResult('Đạt');
+    setScores(defaultScores()); setNotes(''); setResult(results[0].value);
     setCurrentCandidate(null);
   };
 
@@ -364,7 +367,7 @@ export default function InterviewerView() {
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-200 pb-6 mb-8 gap-4">
                     <div>
                       <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight">Ứng viên: <span className="text-blue-600">{currentCandidate.interviewCode}</span></h2>
-                      <p className="text-slate-500 mt-1 font-medium">{currentCandidate.applicationData?.['Họ và tên'] || 'Không rõ tên'}</p>
+                      <p className="text-slate-500 mt-1 font-medium">{getCandidateName(currentCandidate) || 'Không rõ tên'}</p>
                     </div>
                     <div className={`px-5 py-2 rounded-full font-bold text-sm border shadow-sm ${currentCandidate.status === 'moving' ? 'bg-orange-50 text-orange-600 border-orange-200' : 'bg-emerald-50 text-emerald-600 border-emerald-200'}`}>
                       {currentCandidate.status === 'moving' ? 'Đang tiến vào bàn' : 'Đang trong phiên phỏng vấn'}
@@ -394,8 +397,7 @@ export default function InterviewerView() {
                         <div className="space-y-3">
                           {currentCandidate.applicationData && Object.keys(currentCandidate.applicationData).length > 0 ? (
                             Object.entries(currentCandidate.applicationData).map(([key, value], idx) => {
-                                const hiddenKeys = ['Id', 'ID', 'Thời gian bắt đầu', 'Start time', 'Thời gian hoàn thành', 'Completion time', 'Tên+ Nhận xét', 'Kết quả', 'Tên', 'Name', 'Ngôn ngữ', 'Language'];
-                                if (hiddenKeys.includes(key)) return null;
+                                if (config.candidate.hiddenFields.includes(key)) return null;
                                 
                                 let displayValue = value;
                                 if (typeof value === 'string' && (key.toLowerCase().includes('facebook') || value.startsWith('http'))) {
@@ -420,21 +422,17 @@ export default function InterviewerView() {
                       {/* Right 1/2: Evaluation Form */}
                       <div className="xl:w-1/2 space-y-5 flex flex-col justify-between">
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                          {[
-                            { label: 'Thái độ & Tác phong', val: attitude, set: setAttitude },
-                            { label: 'Kỹ năng chuyên môn', val: skill, set: setSkill },
-                            { label: 'Xử lý tình huống', val: problemSolving, set: setProblemSolving },
-                          ].map((item, idx) => (
-                            <div key={idx} className="bg-white/60 backdrop-blur-sm p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
+                          {criteria.map(c => ({ ...c, val: scores[c.key], set: v => setScores(prev => ({ ...prev, [c.key]: Number(v) })) })).map(item => (
+                            <div key={item.key} className="bg-white/60 backdrop-blur-sm p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
                               <label className="block mb-2 font-bold text-slate-700 text-center text-sm">{item.label}</label>
                               <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-bold text-slate-400">1</span>
+                                <span className="text-xs font-bold text-slate-400">{item.min}</span>
                                 <input 
-                                  type="range" min="1" max="10" 
+                                  type="range" min={item.min} max={item.max} 
                                   value={item.val} onChange={e=>item.set(e.target.value)} 
                                   className="w-full mx-2 accent-blue-600 cursor-pointer" 
                                 />
-                                <span className="text-xs font-bold text-slate-400">10</span>
+                                <span className="text-xs font-bold text-slate-400">{item.max}</span>
                               </div>
                               <div className="text-center text-3xl font-black text-blue-600 drop-shadow-sm leading-none">{item.val}</div>
                             </div>
@@ -455,14 +453,14 @@ export default function InterviewerView() {
                         <div className="bg-white/60 backdrop-blur-sm p-4 rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center">
                           <label className="font-bold text-slate-700 text-base">Tổng điểm trung bình:</label>
                           <span className="text-2xl font-black text-indigo-600 bg-indigo-50 px-5 py-1.5 rounded-xl border border-indigo-100 shadow-inner">
-                            {((Number(attitude) + Number(skill) + Number(problemSolving)) / 3).toFixed(1)}
+                            {(criteria.reduce((sum, c) => sum + Number(scores[c.key]), 0) / criteria.length).toFixed(1)}
                           </span>
                         </div>
 
                         <div className="bg-white/60 backdrop-blur-sm p-4 rounded-2xl border border-slate-200 shadow-sm">
                           <label className="block mb-3 font-bold text-slate-700 text-base">Quyết định cuối cùng</label>
                           <div className="flex flex-col sm:flex-row gap-3">
-                            {['Đạt', 'Không đạt', 'Cân nhắc thêm'].map(r => (
+                            {results.map(({ value: r }) => (
                               <button 
                                 key={r} onClick={() => setResult(r)}
                                 className={`flex-1 py-3 rounded-xl font-bold text-sm md:text-base border-2 transition-all shadow-sm ${result === r ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-slate-200 text-slate-500 hover:border-blue-300 hover:bg-blue-50/30'}`}
@@ -517,7 +515,7 @@ export default function InterviewerView() {
                         <span className="bg-indigo-50 text-indigo-600 w-10 h-10 rounded-full flex items-center justify-center font-black">{index + 1}</span>
                         <div>
                           <span className="font-black text-lg text-slate-700 block">{c.interviewCode}</span>
-                          <span className="text-sm font-medium text-slate-500">{c.applicationData?.['Họ và tên'] || ''}</span>
+                          <span className="text-sm font-medium text-slate-500">{getCandidateName(c)}</span>
                         </div>
                       </div>
                       

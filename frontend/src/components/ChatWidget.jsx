@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, X, Send, User as UserIcon, Users, Circle, Search } from 'lucide-react';
 import { io } from 'socket.io-client';
+import { useOrgConfig } from '../orgConfig';
 
 export default function ChatWidget({ currentUser }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -13,8 +14,8 @@ export default function ChatWidget({ currentUser }) {
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
 
-  const ADMIN_NAMES = ['Trần Đức Hoàng Anh', 'Kiều Minh Anh', 'Phạm Việt Bách'];
-  const userDept = currentUser?.department || 'TCKT';
+  const { defaultDepartment, inDepartment } = useOrgConfig();
+  const userDept = currentUser?.department || defaultDepartment;
   const groupRoom = `group_${userDept}`;
 
   useEffect(() => {
@@ -70,7 +71,7 @@ export default function ChatWidget({ currentUser }) {
     const res = await fetch('/api/staff');
     const data = await res.json();
     // Only show staff in the same department, and exclude self
-    setStaff(data.filter(u => u.username !== currentUser?.username && (u.department === userDept || (!u.department && userDept === 'TCKT'))));
+    setStaff(data.filter(u => u.username !== currentUser?.username && inDepartment(u, userDept)));
   };
 
   const fetchMessages = async () => {
@@ -198,7 +199,7 @@ export default function ChatWidget({ currentUser }) {
     );
   };
 
-  const isAllowedToChatInGroup = ADMIN_NAMES.includes(currentUser.fullName) || currentUser.role === 'admin' || (currentUser.roles && currentUser.roles.includes('admin'));
+  const isAllowedToChatInGroup = currentUser.role === 'admin' || (currentUser.roles && currentUser.roles.includes('admin'));
   const groupHasUnread = unreadMessages.some(m => m.receiver === groupRoom);
 
   return (

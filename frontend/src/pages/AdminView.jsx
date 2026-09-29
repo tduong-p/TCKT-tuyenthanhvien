@@ -9,9 +9,11 @@ import Board from './Board';
 import ChatWidget from '../components/ChatWidget';
 import MacBackground from '../components/MacBackground';
 import MacWindow from '../components/MacWindow';
+import { useOrgConfig } from '../orgConfig';
 
 export default function AdminView() {
   const navigate = useNavigate();
+  const { config, departments, defaultDepartment, criteria, results, codeLabel, deptName, deptShortName, inDepartment, getCandidateName, getScore, getAverage, resultTone } = useOrgConfig();
   const handleLogout = () => {
     localStorage.removeItem('user');
     navigate('/');
@@ -68,14 +70,14 @@ export default function AdminView() {
   const [activeTab, setActiveTab] = useState('board'); // board, evaluations, users
   const [draftRoles, setDraftRoles] = useState({});
   const [draftDepartments, setDraftDepartments] = useState({});
-  const [newUser, setNewUser] = useState({ username: '', fullName: '', department: 'TCKT', roles: ['interviewer'] });
-  const [newCandidate, setNewCandidate] = useState({ interviewCode: '', fullName: '', department: 'TCKT' });
+  const [newUser, setNewUser] = useState({ username: '', fullName: '', department: defaultDepartment, roles: ['interviewer'] });
+  const [newCandidate, setNewCandidate] = useState({ interviewCode: '', fullName: '', department: defaultDepartment });
   const [showTablePrompt, setShowTablePrompt] = useState(false);
   const [tableNumber, setTableNumber] = useState('');
   const [roomNumber, setRoomNumber] = useState('');
   const user = JSON.parse(localStorage.getItem('user')) || {};
-  const isSuperAdmin = user.role === 'admin' || (user.roles && user.roles.includes('admin')) || user.fullName === 'Phạm Việt Bách' || user.username === 'Phạm Việt Bách';
-  const [viewDepartment, setViewDepartment] = useState(user.department || 'TCKT');
+  const isSuperAdmin = user.role === 'admin' || (user.roles && user.roles.includes('admin'));
+  const [viewDepartment, setViewDepartment] = useState(user.department || defaultDepartment);
 
   useEffect(() => {
     socketRef.current = io('/');
@@ -165,7 +167,7 @@ export default function AdminView() {
   const handleRemoveFromQueue = async (candidate) => {
     const { value: password } = await Swal.fire({
       title: 'Xác nhận xóa khỏi hàng chờ',
-      text: `Xóa check-in của: ${candidate.applicationData?.['Họ và tên'] || candidate.interviewCode}?`,
+      text: `Xóa check-in của: ${getCandidateName(candidate) || candidate.interviewCode}?`,
       input: 'password',
       inputLabel: 'Nhập mật khẩu để xác nhận:',
       inputPlaceholder: 'Mật khẩu...',
@@ -207,7 +209,7 @@ export default function AdminView() {
     const data = await res.json();
     if (data.success) {
       toast.success('Thêm ứng viên thành công!');
-      setNewCandidate({ interviewCode: '', fullName: '', department: 'TCKT' });
+      setNewCandidate({ interviewCode: '', fullName: '', department: defaultDepartment });
       fetchCandidates();
     } else {
       toast.error(data.error || 'Có lỗi xảy ra');
@@ -225,7 +227,7 @@ export default function AdminView() {
       const data = await res.json();
       if (data.success) {
         toast.success('Đã thêm nhân sự thành công!');
-        setNewUser({ username: '', fullName: '', department: 'TCKT', roles: ['interviewer'] });
+        setNewUser({ username: '', fullName: '', department: defaultDepartment, roles: ['interviewer'] });
         fetchUsers();
       } else {
         toast.error(data.error);
@@ -321,7 +323,7 @@ export default function AdminView() {
     return Math.floor((new Date() - new Date(checkInTime)) / 60000);
   };
 
-  const bottleneckCandidates = boardData.waiting.filter(c => getWaitMinutes(c.checkInTime) > 30);
+  const bottleneckCandidates = boardData.waiting.filter(c => getWaitMinutes(c.checkInTime) > config.waitWarningMinutes);
 
   const handleCleanData = async () => {
     const { value: password } = await Swal.fire({
@@ -350,37 +352,32 @@ export default function AdminView() {
     }
   };
 
-  const filteredEvaluations = evaluations.filter(e => e.department === viewDepartment || (!e.department && viewDepartment === 'TCKT'));
-  const filteredCandidates = candidates.filter(c => c.department === viewDepartment || (!c.department && viewDepartment === 'TCKT'));
+  const filteredEvaluations = evaluations.filter(e => inDepartment(e, viewDepartment));
+  const filteredCandidates = candidates.filter(c => inDepartment(c, viewDepartment));
 
     const exportToExcel = () => {
     if (filteredEvaluations.length === 0) return toast.error('Không có dữ liệu để xuất');
     
-    const dataToExport = filteredEvaluations.map((e, index) => {
-      const avg = ((e.attitudeScore + e.skillScore + e.problemSolvingScore) / 3).toFixed(1);
-      return {
-        'STT': index + 1,
-        'MSSV / Tên Ứng viên': e.candidateName || e.interviewCode,
-        'Người Phỏng vấn': e.interviewerName || e.interviewerUsername,
-        'Thái độ & Tác phong': e.attitudeScore,
-        'Kỹ năng chuyên môn': e.skillScore,
-        'Xử lý tình huống': e.problemSolvingScore,
-        'Điểm Trung bình': parseFloat(avg),
-        'Kết quả': e.result,
-        'Ghi chú / Nhận xét': e.notes || ''
-      };
-    });
+    const dataToExport = filteredEvaluations.map((e, index) => ({
+      'STT': index + 1,
+      [codeLabel]: e.interviewCode,
+      'Tên Ứng viên': e.candidateName || e.interviewCode,
+      'Người Phỏng vấn': e.interviewerName || e.interviewerUsername,
+      ...Object.fromEntries(criteria.map(c => [c.label, getScore(e, c.key)])),
+      'Điểm Trung bình': getAverage(e),
+      'Kết quả': e.result,
+      'Ghi chú / Nhận xét': e.notes || ''
+    }));
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     
     // Auto-size columns
     const wscols = [
       { wch: 5 }, // STT
+      { wch: 15 }, // Code
       { wch: 25 }, // Candidate
       { wch: 25 }, // Interviewer
-      { wch: 20 }, // Attitude
-      { wch: 20 }, // Skill
-      { wch: 20 }, // Problem
+      ...criteria.map(() => ({ wch: 20 })),
       { wch: 15 }, // Avg
       { wch: 15 }, // Result
       { wch: 50 }, // Notes
@@ -422,7 +419,7 @@ export default function AdminView() {
           <tbody>
             {filteredUsers.map((u, index) => {
               const currentRoles = draftRoles[u.username] || u.roles || [];
-              const currentDept = draftDepartments[u.username] !== undefined ? draftDepartments[u.username] : (u.department || "TCKT");
+              const currentDept = draftDepartments[u.username] !== undefined ? draftDepartments[u.username] : (u.department || defaultDepartment);
               const hasChanges = draftRoles[u.username] !== undefined || draftDepartments[u.username] !== undefined;
 
               return (
@@ -436,8 +433,7 @@ export default function AdminView() {
                     onChange={(e) => setDraftDepartments({ ...draftDepartments, [u.username]: e.target.value })}
                     className="bg-slate-100 border border-slate-200 text-slate-700 rounded-lg px-3 py-1 text-sm font-bold focus:outline-none focus:border-blue-500"
                   >
-                    <option value="TCKT">TCKT</option>
-                    <option value="BCS">BCS</option>
+                    {departments.map(d => <option key={d.code} value={d.code}>{d.shortName}</option>)}
                   </select>
                 </td>
                 <td className="p-4">
@@ -522,8 +518,7 @@ export default function AdminView() {
                 onChange={e => setViewDepartment(e.target.value)}
                 className="bg-slate-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               >
-                <option value="TCKT">Ban TCKT</option>
-                <option value="BCS">Ban Cán sự</option>
+                {departments.map(d => <option key={d.code} value={d.code}>{d.shortName}</option>)}
               </select>
             )}
           </div>
@@ -536,7 +531,7 @@ export default function AdminView() {
                 <LogOut size={16} /> Đăng xuất
               </button>
 
-            {['Trần Đức Hoàng Anh', 'Kiều Minh Anh', 'Phạm Việt Bách'].includes(user.fullName) && (
+            {isSuperAdmin && (
               <button 
                 onClick={handleCleanData}
                 className="bg-red-600 hover:bg-red-500 px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-all flex items-center gap-2"
@@ -580,7 +575,7 @@ export default function AdminView() {
                 <div className={`bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border overflow-hidden transition-colors ${bottleneckCandidates.length > 0 ? 'border-red-300' : 'border-slate-200'}`}>
                   <div className={`p-4 flex items-center gap-2 border-b ${bottleneckCandidates.length > 0 ? 'bg-red-50 text-red-700' : 'bg-slate-50 text-slate-700'}`}>
                     <AlertTriangle size={20} className={bottleneckCandidates.length > 0 ? 'animate-pulse' : ''} />
-                    <h2 className="font-bold uppercase tracking-wider text-sm">Cảnh báo chờ lâu (&gt;30p)</h2>
+                    <h2 className="font-bold uppercase tracking-wider text-sm">Cảnh báo chờ lâu (&gt;{config.waitWarningMinutes}p)</h2>
                   </div>
                   
                   <div className="p-4 space-y-3">
@@ -649,9 +644,9 @@ export default function AdminView() {
                     <tr className="bg-slate-50/80 text-slate-700 border-b-2 border-slate-200">
                       <th className="p-4 font-black tracking-wider uppercase text-sm">Ứng Viên</th>
                       <th className="p-4 font-black tracking-wider uppercase text-sm">Người PV</th>
-                      <th className="p-4 font-black tracking-wider uppercase text-sm text-center">Thái độ</th>
-                      <th className="p-4 font-black tracking-wider uppercase text-sm text-center">Kỹ năng</th>
-                      <th className="p-4 font-black tracking-wider uppercase text-sm text-center">Xử lý TH</th>
+                      {criteria.map(c => (
+                        <th key={c.key} className="p-4 font-black tracking-wider uppercase text-sm text-center">{c.shortLabel}</th>
+                      ))}
                       <th className="p-4 font-black tracking-wider uppercase text-sm text-center">Trung bình</th>
                       <th className="p-4 font-black tracking-wider uppercase text-sm text-center">Kết quả</th>
                       <th className="p-4 font-black tracking-wider uppercase text-sm w-1/4">Ghi chú</th>
@@ -660,24 +655,24 @@ export default function AdminView() {
                   <tbody>
                     {filteredEvaluations.length === 0 ? (
                       <tr>
-                        <td colSpan="8" className="p-10 text-center text-slate-500 italic font-medium">Chưa có dữ liệu đánh giá nào.</td>
+                        <td colSpan={criteria.length + 5} className="p-10 text-center text-slate-500 italic font-medium">Chưa có dữ liệu đánh giá nào.</td>
                       </tr>
                     ) : filteredEvaluations.map((e, index) => {
-                      const avg = ((e.attitudeScore + e.skillScore + e.problemSolvingScore) / 3).toFixed(1);
+                      const avg = getAverage(e).toFixed(1);
                       return (
                         <tr key={e._id} className={`border-b border-slate-100 hover:bg-blue-50/50 transition-colors ${index % 2 === 0 ? 'bg-white/40' : 'bg-transparent'}`}>
                           <td className="p-4 font-black text-blue-700 text-lg">{e.candidateName || e.interviewCode}</td>
                           <td className="p-4 font-medium text-slate-600">{e.interviewerName || e.interviewerUsername}</td>
-                          <td className="p-4 text-center font-bold text-slate-700">{e.attitudeScore}</td>
-                          <td className="p-4 text-center font-bold text-slate-700">{e.skillScore}</td>
-                          <td className="p-4 text-center font-bold text-slate-700">{e.problemSolvingScore}</td>
+                          {criteria.map(c => (
+                            <td key={c.key} className="p-4 text-center font-bold text-slate-700">{getScore(e, c.key) ?? '-'}</td>
+                          ))}
                           <td className="p-4 text-center">
                             <span className={`px-3 py-1.5 rounded-lg font-black text-sm shadow-sm border ${avg >= 7 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : avg >= 5 ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
                               {avg}
                             </span>
                           </td>
                           <td className="p-4 text-center">
-                            <span className={`px-4 py-1.5 rounded-full font-black text-xs uppercase tracking-wider shadow-sm ${e.result === 'Đạt' ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-white' : e.result === 'Không đạt' ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white' : 'bg-gradient-to-r from-orange-400 to-amber-500 text-white'}`}>
+                            <span className={`px-4 py-1.5 rounded-full font-black text-xs uppercase tracking-wider shadow-sm ${resultTone(e.result).badge}`}>
                               {e.result}
                             </span>
                           </td>
@@ -698,14 +693,15 @@ export default function AdminView() {
                   <p className="text-sm font-bold text-slate-600 mb-1 uppercase tracking-wider">Còn lại</p>
                   <p className="text-3xl font-black text-slate-800">{filteredCandidates.length > 0 ? filteredCandidates.filter(c => c.status !== 'completed').length : (boardData.waiting.length + boardData.moving.length + boardData.interviewing.length)}</p>
                 </div>
-                <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl shadow-sm text-center">
-                  <p className="text-sm font-bold text-emerald-600 mb-1 uppercase tracking-wider">Đạt</p>
-                  <p className="text-3xl font-black text-emerald-800">{filteredEvaluations.filter(e => e.result === 'Đạt' || e.result === 'Đạt').length}</p>
-                </div>
-                <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl shadow-sm text-center">
-                  <p className="text-sm font-bold text-amber-600 mb-1 uppercase tracking-wider">Cân nhắc thêm</p>
-                  <p className="text-3xl font-black text-amber-800">{filteredEvaluations.filter(e => e.result === 'Cân nhắc thêm' || e.result === 'Cân nhắc').length}</p>
-                </div>
+                {results.map(r => {
+                  const tone = resultTone(r.value);
+                  return (
+                    <div key={r.value} className={`${tone.card} border p-4 rounded-xl shadow-sm text-center`}>
+                      <p className={`text-sm font-bold ${tone.label} mb-1 uppercase tracking-wider`}>{r.value}</p>
+                      <p className={`text-3xl font-black ${tone.value}`}>{filteredEvaluations.filter(e => e.result === r.value).length}</p>
+                    </div>
+                  );
+                })}
               </div>
               
             </div>
@@ -721,17 +717,16 @@ export default function AdminView() {
                 <div className="flex flex-wrap gap-4 items-end">
                   <div className="flex-1 min-w-[200px]">
                     <label className="block text-sm font-bold text-slate-600 mb-1">Tài khoản (để login)</label>
-                    <input type="text" value={newUser.username} onChange={e => setNewUser({...newUser, username: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-blue-500 bg-white" placeholder="vd: phamvietbach" />
+                    <input type="text" value={newUser.username} onChange={e => setNewUser({...newUser, username: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-blue-500 bg-white" placeholder="vd: nguyenvana" />
                   </div>
                   <div className="flex-1 min-w-[200px]">
                     <label className="block text-sm font-bold text-slate-600 mb-1">Họ và Tên</label>
-                    <input type="text" value={newUser.fullName} onChange={e => setNewUser({...newUser, fullName: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-blue-500 bg-white" placeholder="Phạm Việt Bách" />
+                    <input type="text" value={newUser.fullName} onChange={e => setNewUser({...newUser, fullName: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-blue-500 bg-white" placeholder="Nguyễn Văn A" />
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-600 mb-1">Ban</label>
                     <select value={newUser.department} onChange={e => setNewUser({...newUser, department: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-blue-500 bg-white">
-                      <option value="TCKT">TCKT</option>
-                      <option value="BCS">BCS</option>
+                      {departments.map(d => <option key={d.code} value={d.code}>{d.shortName}</option>)}
                     </select>
                   </div>
                   <button onClick={handleAddUser} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-xl shadow-md transition-colors h-[42px]">Thêm</button>
@@ -739,8 +734,7 @@ export default function AdminView() {
               </div>
 
               <div className="overflow-x-auto custom-scrollbar pb-4">
-                {viewDepartment === 'TCKT' && renderUsersTable(usersList.filter(u => !u.department || u.department === 'TCKT'), 'Danh sách nhân sự: Ban TCKT')}
-                {viewDepartment === 'BCS' && renderUsersTable(usersList.filter(u => u.department === 'BCS'), 'Danh sách nhân sự: Ban Cán sự Năm nhất')}
+                {renderUsersTable(usersList.filter(u => inDepartment(u, viewDepartment)), `Danh sách nhân sự: ${deptName(viewDepartment)}`)}
               </div>
             </div>
           )}
@@ -753,8 +747,8 @@ export default function AdminView() {
                 <h3 className="text-lg font-bold text-slate-700 mb-4">Thêm ứng viên bổ sung</h3>
                 <form onSubmit={handleAddCandidate} className="flex flex-wrap gap-4 items-end">
                   <div className="flex-1 min-w-[200px]">
-                    <label className="block text-sm font-bold text-slate-600 mb-1">Mã Ứng Viên (MSSV)</label>
-                    <input type="text" value={newCandidate.interviewCode} onChange={e => setNewCandidate({...newCandidate, interviewCode: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-blue-500 bg-white" placeholder="vd: 202513118" />
+                    <label className="block text-sm font-bold text-slate-600 mb-1">Mã Ứng Viên ({codeLabel})</label>
+                    <input type="text" value={newCandidate.interviewCode} onChange={e => setNewCandidate({...newCandidate, interviewCode: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-blue-500 bg-white" placeholder={config.candidate.codePlaceholder || ''} />
                   </div>
                   <div className="flex-1 min-w-[200px]">
                     <label className="block text-sm font-bold text-slate-600 mb-1">Họ và Tên</label>
@@ -763,8 +757,7 @@ export default function AdminView() {
                   <div>
                     <label className="block text-sm font-bold text-slate-600 mb-1">Ban</label>
                     <select value={newCandidate.department} onChange={e => setNewCandidate({...newCandidate, department: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-blue-500 bg-white">
-                      <option value="TCKT">TCKT</option>
-                      <option value="BCS">BCS</option>
+                      {departments.map(d => <option key={d.code} value={d.code}>{d.shortName}</option>)}
                     </select>
                   </div>
                   <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-xl shadow-md transition-colors h-[42px]">Thêm</button>
@@ -788,9 +781,9 @@ export default function AdminView() {
                     {filteredCandidates.map((c, index) => (
                       <tr key={c._id} className="border-b border-slate-100 hover:bg-white/60 transition-colors">
                         <td className="p-4 font-bold text-slate-500 text-center">{index + 1}</td>
-                        <td className="p-4 font-bold text-slate-800">{c.applicationData?.['Họ và tên'] || c.applicationData?.['Họ tên'] || '-'}</td>
+                        <td className="p-4 font-bold text-slate-800">{getCandidateName(c) || '-'}</td>
                         <td className="p-4 font-bold text-slate-800">{c.interviewCode}</td>
-                        <td className="p-4 text-slate-600 font-medium">{c.department || "TCKT"}</td>
+                        <td className="p-4 text-slate-600 font-medium">{deptShortName(c.department || defaultDepartment)}</td>
                         <td className="p-4 font-bold text-slate-600">{
                           c.status === 'active' ? "Chưa điểm danh" :
                           c.status === 'waiting' ? "Đang chờ" :

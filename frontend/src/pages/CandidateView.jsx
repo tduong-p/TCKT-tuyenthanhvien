@@ -4,6 +4,7 @@ import { io } from 'socket.io-client';
 import { LogOut, CheckCircle2, Clock, MapPin, Handshake } from 'lucide-react';
 import MacBackground from '../components/MacBackground';
 import MacWindow from '../components/MacWindow';
+import { useOrgConfig } from '../orgConfig';
 
 export default function CandidateView() {
   const [user, setUser] = useState(null);
@@ -17,6 +18,7 @@ export default function CandidateView() {
   const [flash, setFlash] = useState(false);
   const [hasAcked, setHasAcked] = useState(false);
   const socketRef = useRef(null);
+  const { deptShortName } = useOrgConfig();
 
   useEffect(() => {
     const stored = JSON.parse(localStorage.getItem('user'));
@@ -90,7 +92,7 @@ export default function CandidateView() {
        setStatus('active');
          setAssignedTable(null);
          setAssignedRoom(null);
-       toast.success(`Chuyển sang check-in cho Ban ${data.department}!`);
+       toast.success(`Chuyển sang check-in cho ${deptShortName(data.department)}!`);
     }
   };
 

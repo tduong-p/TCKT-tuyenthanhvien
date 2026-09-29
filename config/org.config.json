@@ -1,0 +1,79 @@
+{
+  "appTitle": "TUYỂN THÀNH VIÊN",
+  "systemName": "Hệ thống phỏng vấn",
+
+  "branding": {
+    "favicon": "/org-assets/tckt_logo.png",
+    "background": "/org-assets/bg_k71.png",
+    "qrImage": "/org-assets/qr.jpeg",
+    "decorations": [
+      "/org-assets/props/prop_19.png",
+      "/org-assets/props/prop_18.png",
+      "/org-assets/props/prop_12.png",
+      "/org-assets/props/prop_11.png",
+      "/org-assets/props/prop_15.png",
+      "/org-assets/props/prop_10.png",
+      "/org-assets/props/prop_9.png",
+      "/org-assets/props/prop_14.png",
+      "/org-assets/props/prop_7.png",
+      "/org-assets/props/prop_17.png",
+      "/org-assets/props/prop_8.png",
+      "/org-assets/props/prop_16.png"
+    ]
+  },
+
+  "footer": {
+    "heading": "DYC x Ban Tổ chức - Kiểm tra",
+    "logos": [
+      { "src": "/org-assets/dyc_logo.png", "alt": "DYC Logo", "href": "https://web.facebook.com/dyc.hust" },
+      { "src": "/org-assets/tckt_logo.png", "alt": "Ban TC-KT Logo", "href": "https://web.facebook.com/BanTCKT.HUST" }
+    ],
+    "creditsPrefix": "Đây là một sản phẩm của",
+    "credits": [
+      { "label": "Câu lạc bộ Thanh niên số Đoàn Đại học Bách khoa Hà Nội (DYC)", "href": "https://web.facebook.com/dyc.hust" },
+      { "label": "Ban Tổ chức - Kiểm tra Đoàn Đại học Bách khoa Hà Nội", "href": "https://web.facebook.com/BanTCKT.HUST" }
+    ]
+  },
+
+  "candidate": {
+    "codeLabel": "MSSV",
+    "codePlaceholder": "vd: 202513118",
+    "nameFields": ["Họ và tên", "Họ tên", "Ho va ten", "fullName"],
+    "phoneFields": ["Điện thoại", "Số điện thoại"],
+    "hiddenFields": ["Id", "ID", "Thời gian bắt đầu", "Start time", "Thời gian hoàn thành", "Completion time", "Tên+ Nhận xét", "Kết quả", "Tên", "Name", "Ngôn ngữ", "Language"]
+  },
+
+  "departments": [
+    {
+      "code": "TCKT",
+      "shortName": "Ban TCKT",
+      "name": "Ban Tổ chức - Kiểm tra",
+      "titleImage": "/org-assets/title_k71.png",
+      "tvTitleScale": 3,
+      "theme": "blue"
+    },
+    {
+      "code": "BCS",
+      "shortName": "Ban Cán sự",
+      "name": "Ban Cán sự năm nhất",
+      "titleImage": "/org-assets/title_bcs.png",
+      "tvTitleScale": 3,
+      "theme": "emerald"
+    }
+  ],
+
+  "evaluation": {
+    "criteria": [
+      { "key": "attitude", "label": "Thái độ & Tác phong", "shortLabel": "Thái độ", "min": 1, "max": 10, "default": 5 },
+      { "key": "skill", "label": "Kỹ năng chuyên môn", "shortLabel": "Kỹ năng", "min": 1, "max": 10, "default": 5 },
+      { "key": "problemSolving", "label": "Xử lý tình huống", "shortLabel": "Xử lý TH", "min": 1, "max": 10, "default": 5 }
+    ],
+    "results": [
+      { "value": "Đạt", "tone": "success" },
+      { "value": "Không đạt", "tone": "danger" },
+      { "value": "Cân nhắc thêm", "tone": "warning" }
+    ]
+  },
+
+  "waitWarningMinutes": 30
+}
