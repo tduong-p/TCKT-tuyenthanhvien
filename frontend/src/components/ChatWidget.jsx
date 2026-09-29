@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, X, Send, User as UserIcon, Users, Circle, Search } from 'lucide-react';
-import { io } from 'socket.io-client';
+import { createSocket } from '../socket';
 import { useOrgConfig } from '../orgConfig';
 
 export default function ChatWidget({ currentUser }) {
@@ -23,7 +23,7 @@ export default function ChatWidget({ currentUser }) {
     fetchMessages();
     const interval = setInterval(fetchStaff, 5000); // Polling for staff status
 
-    socketRef.current = io('/');
+    socketRef.current = createSocket();
     
     if (currentUser) {
       socketRef.current.emit('user_online', currentUser.username);

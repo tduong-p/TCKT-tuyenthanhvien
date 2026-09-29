@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import toast from 'react-hot-toast';
-import { io } from 'socket.io-client';
+import { createSocket } from '../socket';
 import { LogOut, CheckCircle2, Clock, MapPin, Handshake } from 'lucide-react';
 import MacBackground from '../components/MacBackground';
 import MacWindow from '../components/MacWindow';
@@ -27,7 +27,7 @@ export default function CandidateView() {
       fetchStatus(stored.interviewCode);
     }
     
-    socketRef.current = io('/');
+    socketRef.current = createSocket();
     
     socketRef.current.on('candidate_assigned', (data) => {
       // B2 fix: guard against stored being null

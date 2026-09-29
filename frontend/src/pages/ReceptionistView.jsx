@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { Users, Monitor, List, CheckCircle, RefreshCw, LogOut } from 'lucide-react';
-import io from 'socket.io-client';
+import { createSocket } from '../socket';
 import Board from './Board';
 import ChatWidget from '../components/ChatWidget';
 import MacBackground from '../components/MacBackground';
@@ -76,7 +76,7 @@ export default function ReceptionistView() {
     if (stored) setUser(stored);
     setIsLoaded(true);
     
-    socketRef.current = io('/');
+    socketRef.current = createSocket();
     fetchBoard();
     const interval = setInterval(fetchBoard, 3000);
     return () => {

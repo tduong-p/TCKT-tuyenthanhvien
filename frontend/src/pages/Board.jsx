@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { io } from 'socket.io-client';
+import { createSocket } from '../socket';
 import { Users, PlayCircle, UserCheck, CheckCircle2, Clock, Loader2, Sparkles } from 'lucide-react';
 import MacBackground from '../components/MacBackground';
 import MacWindow from '../components/MacWindow';
@@ -21,7 +21,7 @@ export default function Board({ hideHeader, department, isAdmin, onRemoveCandida
     fetchBoard();
     const interval = setInterval(fetchBoard, 5000);
     
-    const socket = io('/');
+    const socket = createSocket();
     socket.on('board_update', fetchBoard);
 
     return () => {

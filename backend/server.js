@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+const crypto = require('crypto');
 require('dotenv').config();
 
 const Candidate = require('./models/Candidate');
@@ -17,7 +18,28 @@ app.use(cors());
 app.use(express.json());
 
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = process.env.JWT_SECRET || 'tckt_super_secret_key';
+const IS_PROD = process.env.NODE_ENV === 'production';
+let JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  // Random per-process secret: safe, but everyone is logged out when the server restarts
+  JWT_SECRET = crypto.randomBytes(32).toString('hex');
+  console.warn('[security] JWT_SECRET is not set - using a random secret; sessions will not survive restarts.');
+}
+// Shared staff password for this deployment. Required in production.
+const STAFF_PASSWORD = process.env.STAFF_PASSWORD || (IS_PROD ? null : 'Abc@123');
+if (!process.env.STAFF_PASSWORD) {
+  console.warn(IS_PROD
+    ? '[security] STAFF_PASSWORD is not set - staff login is disabled.'
+    : '[security] STAFF_PASSWORD is not set - using dev default "Abc@123".');
+}
+
+const safeEqual = (a, b) => {
+  const ha = crypto.createHash('sha256').update(String(a)).digest();
+  const hb = crypto.createHash('sha256').update(String(b)).digest();
+  return crypto.timingSafeEqual(ha, hb);
+};
+
+const hasRole = (u, role) => !!u && (u.role === role || (Array.isArray(u.roles) && u.roles.includes(role)));
 
 const authMiddleware = async (req, res, next) => {
   // Allow public/read-only routes without token
@@ -32,21 +54,32 @@ const authMiddleware = async (req, res, next) => {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     
-    // For sensitive Admin routes, check DB for live roles and hardcoded names
-    if (req.path.startsWith('/admin')) {
-       const dbUser = await User.findById(req.user.id);
-       const isAdmin = dbUser && (dbUser.role === 'admin' || (dbUser.roles && dbUser.roles.includes('admin')));
-       if (!isAdmin) {
-         return res.status(403).json({ success: false, message: 'Forbidden: Admins only' });
-       }
-    }
-    
     next();
   } catch (e) {
     return res.status(401).json({ success: false, message: 'Invalid or expired token' });
   }
 };
 app.use('/api', authMiddleware);
+
+// Staff-only guard. Loads the live user from DB (roles may have changed since the token was issued)
+// into req.staff. With roles given, the user needs one of them; admins pass every check.
+const requireStaff = (...roles) => async (req, res, next) => {
+  try {
+    if (!req.user || req.user.role === 'candidate') {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+    const dbUser = await User.findById(req.user.id);
+    if (!dbUser) return res.status(401).json({ success: false, message: 'Tài khoản không tồn tại' });
+    if (roles.length && !hasRole(dbUser, 'admin') && !roles.some(r => hasRole(dbUser, r))) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền thực hiện thao tác này' });
+    }
+    req.staff = dbUser;
+    next();
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+app.use('/api/admin', requireStaff('admin'));
 
 // Org-specific branding assets (logos, backgrounds, QR...) live next to the org config
 app.use('/org-assets', express.static(ASSETS_DIR));
@@ -116,13 +149,23 @@ setInterval(assignCandidates, 3000); // Check every 3 seconds
 
 const onlineSockets = new Map();
 
+// Sockets may connect anonymously (TV / public board); actions below check socket.user
+io.use((socket, next) => {
+  const token = socket.handshake.auth && socket.handshake.auth.token;
+  if (token) {
+    try { socket.user = jwt.verify(token, JWT_SECRET); } catch (e) { /* treat as anonymous */ }
+  }
+  next();
+});
+
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
   let socketUsername = null;
 
-  socket.on('user_online', (username) => {
-    socketUsername = username;
-    onlineSockets.set(socket.id, username);
+  socket.on('user_online', () => {
+    if (!socket.user || !socket.user.username) return;
+    socketUsername = socket.user.username;
+    onlineSockets.set(socket.id, socketUsername);
     io.emit('online_users', Array.from(new Set(onlineSockets.values())));
   });
 
@@ -137,14 +180,13 @@ io.on('connection', (socket) => {
   // Candidate checks in
   socket.on('candidate_checkin', async (data) => {
     try {
-      if (!data.interviewCode) return;
+      // Candidates can only check themselves in
+      if (!data || !socket.user || socket.user.role !== 'candidate' || data.interviewCode !== socket.user.interviewCode) return;
       let query = { interviewCode: data.interviewCode };
       if (data.department) query.department = data.department;
       
-      let candidate = await Candidate.findOne(query);
-      if (!candidate) {
-        candidate = new Candidate({ interviewCode: data.interviewCode, department: data.department || defaultDepartment });
-      }
+      const candidate = await Candidate.findOne(query);
+      if (!candidate) return;
       if (candidate.status === 'active' || !candidate.status) {
         candidate.status = 'waiting';
         candidate.checkInTime = new Date();
@@ -164,6 +206,7 @@ io.on('connection', (socket) => {
   // Interviewer confirms candidate arrived
   socket.on('interviewer_confirm_presence', async (data) => {
     try {
+      if (!data || !socket.user || socket.user.role === 'candidate') return;
       let query = { interviewCode: data.interviewCode };
       if (data.department) query.department = data.department;
       const candidate = await Candidate.findOne(query);
@@ -216,13 +259,15 @@ app.post('/api/login', async (req, res) => {
     let user = await User.findOne({ username: { $regex: new RegExp(`^${escapedCode}$`, 'i') } });
     if (user) {
         const { password } = req.body;
-        const expectedPassword = user.password || 'Abc@123';
         
         if (!password) {
           return res.json({ success: true, requirePassword: true });
         }
         
-        if (password !== expectedPassword) {
+        if (!STAFF_PASSWORD) {
+          return res.status(503).json({ success: false, message: 'Hệ thống chưa cấu hình mật khẩu nhân sự (STAFF_PASSWORD).' });
+        }
+        if (!safeEqual(password, STAFF_PASSWORD)) {
           return res.status(401).json({ success: false, message: 'Sai mật khẩu!' });
         }
 
@@ -255,37 +300,53 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+// Fields safe to show on public screens (no phone/email/answers from applicationData)
+const publicCandidateFields = () => {
+  const fields = { interviewCode: 1, status: 1, department: 1, assignedRoom: 1, assignedTable: 1, checkInTime: 1 };
+  orgConfig.candidate.nameFields.forEach(f => { fields[`applicationData.${f}`] = 1; });
+  return fields;
+};
+
+// Public route (no auth middleware): staff tokens get full candidate data, everyone else the public fields
 app.get('/api/board', async (req, res) => {
-  const { department } = req.query;
-  const filter = department ? { department } : {};
-  const waiting = await Candidate.find({ status: 'waiting', ...filter }).sort({ checkInTime: 1 });
-  const moving = await Candidate.find({ status: 'moving', ...filter });
-  const interviewing = await Candidate.find({ status: 'interviewing', ...filter });
-  const completed = await Candidate.find({ status: 'completed', ...filter });
-  res.json({ waiting, moving, interviewing, completed });
+  try {
+    const { department } = req.query;
+    const filter = department ? { department } : {};
+    let isStaff = false;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try { isStaff = jwt.verify(authHeader.split(' ')[1], JWT_SECRET).role !== 'candidate'; } catch (e) { /* anonymous */ }
+    }
+    const find = (q) => {
+      const query = Candidate.find({ ...q, ...filter });
+      return isStaff ? query : query.select(publicCandidateFields());
+    };
+    const [waiting, moving, interviewing, completed] = await Promise.all([
+      find({ status: 'waiting' }).sort({ checkInTime: 1 }),
+      find({ status: 'moving' }),
+      find({ status: 'interviewing' }),
+      find({ status: 'completed' })
+    ]);
+    res.json({ waiting, moving, interviewing, completed });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/tv-board', async (req, res) => {
   const { department } = req.query;
   const filter = department ? { department } : {};
   
-  const fields = {
-    interviewCode: 1,
-    status: 1,
-    department: 1,
-    assignedRoom: 1,
-    assignedTable: 1,
-    checkInTime: 1
-  };
-  orgConfig.candidate.nameFields.forEach(f => { fields[`applicationData.${f}`] = 1; });
+  const fields = publicCandidateFields();
   const waiting = await Candidate.find({ status: 'waiting', ...filter }).select(fields).sort({ checkInTime: 1 }).lean();
   const moving = await Candidate.find({ status: 'moving', ...filter }).select(fields).lean();
   const interviewing = await Candidate.find({ status: 'interviewing', ...filter }).select(fields).lean();
   res.json({ waiting, moving, interviewing });
 });
 
-app.post('/api/evaluation', async (req, res) => {
-  const { interviewCode, department, interviewerUsername, scores, notes, result } = req.body;
+app.post('/api/evaluation', requireStaff('interviewer'), async (req, res) => {
+  const { interviewCode, department, scores, notes, result } = req.body;
+  const interviewerUsername = req.staff.username;
   try {
     if (!isValidResult(result)) return res.status(400).json({ success: false, message: 'Kết quả đánh giá không hợp lệ' });
     const scoreList = [];
@@ -319,43 +380,37 @@ app.post('/api/evaluation', async (req, res) => {
   }
 });
 
-app.post('/api/staff/leave', async (req, res) => {
-  const { username } = req.body;
+app.post('/api/staff/leave', requireStaff(), async (req, res) => {
   try {
-    const user = await User.findOne({ username });
-    if (user) {
-      // Bỏ gán ứng viên hiện tại nếu đang pv dở
-      if (user.tableNumber && user.roomNumber) {
-        await Candidate.updateMany(
-          { assignedTable: user.tableNumber, assignedRoom: user.roomNumber, department: user.department, status: { $in: ['moving', 'interviewing'] } },
-          { $set: { status: 'waiting', assignedTable: null, assignedRoom: null, checkInTime: new Date(0) } }
-        );
-      }
-      
-      user.tableNumber = null;
-      user.roomNumber = null;
-      user.status = 'active';
-      await user.save();
-      io.emit('board_update');
-      io.emit('staff_update');
+    const user = req.staff;
+    // Bỏ gán ứng viên hiện tại nếu đang pv dở
+    if (user.tableNumber && user.roomNumber) {
+      await Candidate.updateMany(
+        { assignedTable: user.tableNumber, assignedRoom: user.roomNumber, department: user.department, status: { $in: ['moving', 'interviewing'] } },
+        { $set: { status: 'waiting', assignedTable: null, assignedRoom: null, checkInTime: new Date(0) } }
+      );
     }
+    
+    user.tableNumber = null;
+    user.roomNumber = null;
+    user.status = 'active';
+    await user.save();
+    io.emit('board_update');
+    io.emit('staff_update');
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/staff/status', async (req, res) => {
-  const { username, status } = req.body; // status: active or break
+app.post('/api/staff/status', requireStaff(), async (req, res) => {
+  const { status } = req.body;
+  if (!['active', 'break'].includes(status)) return res.status(400).json({ success: false, message: 'Trạng thái không hợp lệ' });
   try {
-    const user = await User.findOne({ username });
-    if (user) {
-      user.status = status;
-      await user.save();
-      res.json({ success: true, user });
-    } else {
-      res.status(404).json({ success: false });
-    }
+    const user = req.staff;
+    user.status = status;
+    await user.save();
+    res.json({ success: true, user });
   } catch (err) {
     res.status(500).json({ success: false });
   }
@@ -363,8 +418,11 @@ app.post('/api/staff/status', async (req, res) => {
 
 app.post('/api/admin/clean-data', async (req, res) => {
   const { password } = req.body;
-  const expectedPassword = process.env.ADMIN_CLEAN_PASSWORD || 'Việt Bách đẹp chai vkl';
-  if (password !== expectedPassword) {
+  const expectedPassword = process.env.ADMIN_CLEAN_PASSWORD;
+  if (!expectedPassword) {
+    return res.status(503).json({ success: false, message: 'Chưa cấu hình ADMIN_CLEAN_PASSWORD trên server.' });
+  }
+  if (!password || !safeEqual(password, expectedPassword)) {
     return res.status(401).json({ success: false, message: 'Sai mật khẩu!' });
   }
   try {
@@ -390,7 +448,7 @@ app.post('/api/admin/clean-data', async (req, res) => {
   }
 });
 
-app.get('/api/candidates', async (req, res) => {
+app.get('/api/candidates', requireStaff('receptionist'), async (req, res) => {
   try {
     const cands = await Candidate.find().sort({ checkInTime: -1 }).lean();
     res.json(cands);
@@ -399,7 +457,7 @@ app.get('/api/candidates', async (req, res) => {
   }
 });
 
-app.get('/api/evaluations', async (req, res) => {
+app.get('/api/evaluations', requireStaff('admin'), async (req, res) => {
   try {
     const { department } = req.query;
     const evalFilter = department ? { department } : {};
@@ -434,7 +492,7 @@ app.get('/api/evaluations', async (req, res) => {
 });
 
 // Chat APIs
-app.get('/api/staff', async (req, res) => {
+app.get('/api/staff', requireStaff(), async (req, res) => {
   try {
     const staff = await User.find({ status: { $ne: null } }).select('-password');
     res.json(staff);
@@ -443,7 +501,7 @@ app.get('/api/staff', async (req, res) => {
   }
 });
 
-app.get('/api/messages', async (req, res) => {
+app.get('/api/messages', requireStaff(), async (req, res) => {
   try {
     const messages = await Message.find().sort({ createdAt: -1 }).limit(100);
     res.json(messages.reverse());
@@ -452,15 +510,18 @@ app.get('/api/messages', async (req, res) => {
   }
 });
 
-app.post('/api/messages', async (req, res) => {
+app.post('/api/messages', requireStaff(), async (req, res) => {
   try {
-    const { sender, senderRole, receiver, content } = req.body;
+    const { receiver, content } = req.body;
+    const sender = req.staff.username;
+    const senderRole = req.staff.role;
+    if (typeof receiver !== 'string' || !receiver || typeof content !== 'string' || !content.trim()) {
+      return res.status(400).json({ error: 'Thiếu người nhận hoặc nội dung' });
+    }
     
     // Group chat requires admin privileges
     if (receiver.startsWith('group')) {
-      const user = await User.findOne({ username: sender });
-      const isAdmin = user && (user.role === 'admin' || (user.roles && user.roles.includes('admin')));
-      if (!isAdmin) {
+      if (!hasRole(req.staff, 'admin')) {
         return res.status(403).json({ error: 'Only admins can send group messages' });
       }
     }
@@ -474,9 +535,11 @@ app.post('/api/messages', async (req, res) => {
   }
 });
 
-app.post('/api/messages/read', async (req, res) => {
+app.post('/api/messages/read', requireStaff(), async (req, res) => {
   try {
-    const { username, receiver } = req.body; // who is reading, and what chat they are reading (sender username or 'group_XYZ')
+    const { receiver } = req.body; // what chat is being read (sender username or 'group_XYZ')
+    const username = req.staff.username;
+    if (typeof receiver !== 'string') return res.status(400).json({ error: 'Thiếu receiver' });
     let filter = {};
     if (receiver.startsWith('group')) {
       filter = { receiver: receiver };
@@ -499,27 +562,22 @@ app.post('/api/messages/read', async (req, res) => {
 // New APIs for Custom Workflow
 // ----------------------------------------------------
 
-app.post('/api/interviewer/settings', async (req, res) => {
-  const { username, autoAssign } = req.body;
+app.post('/api/interviewer/settings', requireStaff('interviewer'), async (req, res) => {
+  const { autoAssign } = req.body;
   try {
-    const user = await User.findOne({ username });
-    if (user) {
-      user.autoAssign = autoAssign;
-      await user.save();
-      res.json({ success: true, autoAssign: user.autoAssign });
-    } else {
-      res.status(404).json({ success: false });
-    }
+    const user = req.staff;
+    user.autoAssign = !!autoAssign;
+    await user.save();
+    res.json({ success: true, autoAssign: user.autoAssign });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-app.post('/api/interviewer/cancel', async (req, res) => {
-  const { username, interviewCode } = req.body;
+app.post('/api/interviewer/cancel', requireStaff('interviewer'), async (req, res) => {
+  const { interviewCode } = req.body;
   try {
-    const interviewer = await User.findOne({ username });
-    if (!interviewer) return res.status(400).json({ success: false, message: 'Invalid interviewer' });
+    const interviewer = req.staff;
 
     const candidate = await Candidate.findOneAndUpdate(
       { 
@@ -548,12 +606,10 @@ app.post('/api/interviewer/cancel', async (req, res) => {
   }
 });
 
-app.post('/api/interviewer/call', async (req, res) => {
-  const { username, interviewCode } = req.body;
+app.post('/api/interviewer/call', requireStaff('interviewer'), async (req, res) => {
+  const { interviewCode } = req.body;
   try {
-    // Find by username only - be flexible on role/status
-    const interviewer = await User.findOne({ username });
-    if (!interviewer) return res.status(400).json({ success: false, message: 'Không tìm thấy tài khoản người phỏng vấn' });
+    const interviewer = req.staff;
     if (!interviewer.tableNumber || !interviewer.roomNumber) return res.status(400).json({ success: false, message: 'Người phỏng vấn chưa có số phòng/bàn. Vui lòng đăng nhập lại và nhập số phòng, số bàn.' });
     if (interviewer.status === 'break') return res.status(400).json({ success: false, message: 'Người phỏng vấn đang tạm nghỉ. Vui lòng bật lại trạng thái sẵn sàng.' });
 
@@ -596,15 +652,16 @@ app.post('/api/interviewer/call', async (req, res) => {
   }
 });
 
-app.post('/api/staff/switch-role', async (req, res) => {
-  const { username, targetRole, tableNumber, roomNumber } = req.body;
+app.post('/api/staff/switch-role', requireStaff(), async (req, res) => {
+  const { targetRole, tableNumber, roomNumber } = req.body;
   try {
-    const user = await User.findOne({ username });
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    const user = req.staff;
+    if (!['interviewer', 'admin', 'receptionist'].includes(targetRole)) {
+      return res.status(400).json({ success: false, message: 'Vai trò không hợp lệ' });
+    }
     
-    // Safety check: User can switch to targetRole if they have it in their roles array
-    const allowed = user.roles && user.roles.includes(targetRole);
-    if (!allowed && user.role !== 'admin' && !(user.roles && user.roles.includes('admin'))) {
+    // User can switch to targetRole if they have it in their roles array (admins can switch to any role)
+    if (!(user.roles && user.roles.includes(targetRole)) && !hasRole(user, 'admin')) {
       return res.status(403).json({ success: false, message: 'Not allowed to switch to this role' });
     }
 
@@ -622,13 +679,18 @@ app.post('/api/staff/switch-role', async (req, res) => {
 });
 
 
-app.get('/api/users', async (req, res) => {
+const VALID_ROLES = ['interviewer', 'admin', 'receptionist'];
+
+app.get('/api/users', requireStaff('admin'), async (req, res) => {
   const users = await User.find().lean();
   res.json(users);
 });
 
-app.post('/api/users/update', async (req, res) => {
+app.post('/api/users/update', requireStaff('admin'), async (req, res) => {
   const { username, roles, department } = req.body;
+  if (roles && (!Array.isArray(roles) || roles.some(r => !VALID_ROLES.includes(r)))) {
+    return res.status(400).json({ success: false, error: 'Quyền không hợp lệ' });
+  }
   const u = await User.findOne({ username });
   if (u) {
     if (roles) {
@@ -646,10 +708,11 @@ app.post('/api/users/update', async (req, res) => {
   res.json({ success: true });
 });
 
-app.post('/api/users/add', async (req, res) => {
+app.post('/api/users/add', requireStaff('admin'), async (req, res) => {
   try {
     const { username, fullName, department, roles } = req.body;
     if (!username) return res.status(400).json({ error: "Thiếu username" });
+    if (roles && (!Array.isArray(roles) || roles.some(r => !VALID_ROLES.includes(r)))) return res.status(400).json({ error: "Quyền không hợp lệ" });
     if (department && !isValidDepartment(department)) return res.status(400).json({ error: "Ban không hợp lệ" });
     
     let u = await User.findOne({ username });
@@ -669,11 +732,11 @@ app.post('/api/users/add', async (req, res) => {
   }
 });
 
-app.delete('/api/users/:username', async (req, res) => {
+app.delete('/api/users/:username', requireStaff('admin'), async (req, res) => {
   try {
     const { username } = req.params;
-    if (username.toLowerCase().includes("admin") || username.toLowerCase().includes("bach") || username === "Phạm Việt Bách") {
-      return res.status(400).json({ error: "Không thể xóa Super Admin" });
+    if (username === req.staff.username) {
+      return res.status(400).json({ error: "Không thể tự xóa tài khoản của mình" });
     }
     await User.deleteOne({ username });
     res.json({ success: true });
@@ -686,7 +749,7 @@ const buildPath = path.join(__dirname, '../frontend/dist');
 app.use(express.static(buildPath));
 
 
-app.post('/api/candidates/reset-checkin', async (req, res) => {
+app.post('/api/candidates/reset-checkin', requireStaff('admin'), async (req, res) => {
   const { interviewCode, department } = req.body;
   try {
     const candidate = await Candidate.findOne({ interviewCode, department });
@@ -706,7 +769,7 @@ app.post('/api/candidates/reset-checkin', async (req, res) => {
   }
 });
 
-app.post('/api/candidates/checkin', async (req, res) => {
+app.post('/api/candidates/checkin', requireStaff('receptionist'), async (req, res) => {
   let { interviewCode, department } = req.body;
   if (interviewCode) interviewCode = interviewCode.trim().toUpperCase();
 
@@ -729,7 +792,7 @@ app.post('/api/candidates/checkin', async (req, res) => {
   }
 });
 
-app.post('/api/candidates/add', async (req, res) => {
+app.post('/api/candidates/add', requireStaff('receptionist'), async (req, res) => {
     try {
       const { interviewCode, fullName } = req.body;
       const department = req.body.department || defaultDepartment;

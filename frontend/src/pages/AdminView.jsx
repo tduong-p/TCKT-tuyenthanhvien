@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx';
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, LayoutDashboard, Users, AlertTriangle, Download, Clock, ShieldCheck, FileText, RefreshCw, Hash, Trash2, List } from 'lucide-react';
-import io from 'socket.io-client';
+import { createSocket } from '../socket';
 import Board from './Board';
 import ChatWidget from '../components/ChatWidget';
 import MacBackground from '../components/MacBackground';
@@ -80,7 +80,7 @@ export default function AdminView() {
   const [viewDepartment, setViewDepartment] = useState(user.department || defaultDepartment);
 
   useEffect(() => {
-    socketRef.current = io('/');
+    socketRef.current = createSocket();
     fetchBoard();
     const interval = setInterval(fetchBoard, 3000);
     return () => {
@@ -165,21 +165,16 @@ export default function AdminView() {
 
 
   const handleRemoveFromQueue = async (candidate) => {
-    const { value: password } = await Swal.fire({
+    const confirm = await Swal.fire({
       title: 'Xác nhận xóa khỏi hàng chờ',
       text: `Xóa check-in của: ${getCandidateName(candidate) || candidate.interviewCode}?`,
-      input: 'password',
-      inputLabel: 'Nhập mật khẩu để xác nhận:',
-      inputPlaceholder: 'Mật khẩu...',
+      icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Xóa',
       confirmButtonColor: '#d33',
       cancelButtonText: 'Hủy',
     });
-    if (!password) return;
-    if (password !== 'Abc@123') {
-      return Swal.fire('Sai mật khẩu!', 'Không thể thực hiện thao tác này.', 'error');
-    }
+    if (!confirm.isConfirmed) return;
     try {
       const res = await fetch('/api/candidates/reset-checkin', {
         method: 'POST',

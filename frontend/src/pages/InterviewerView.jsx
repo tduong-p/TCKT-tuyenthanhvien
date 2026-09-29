@@ -2,7 +2,7 @@ import Swal from 'sweetalert2';
 import React, { useEffect, useState, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
-import { io } from 'socket.io-client';
+import { createSocket } from '../socket';
 import { Coffee, User, CheckCircle, Save, MessageSquare, UserCheck, Loader2, RefreshCw, Hand, X, XCircle, LogOut } from 'lucide-react';
 import ChatWidget from '../components/ChatWidget';
 import { useOrgConfig } from '../orgConfig';
@@ -82,7 +82,7 @@ export default function InterviewerView() {
     }
     setIsLoaded(true);
     
-    socketRef.current = io('/');
+    socketRef.current = createSocket();
     socketRef.current.on('board_update', () => {
       if (stored) fetchBoard();
     });

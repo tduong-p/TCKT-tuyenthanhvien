@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { io } from "socket.io-client";
+import { createSocket } from '../socket';
 import { Volume2, VolumeX, Monitor, BellRing } from "lucide-react";
 import MacBackground from "../components/MacBackground";
 import { useOrgConfig } from "../orgConfig";
@@ -13,7 +13,7 @@ export default function TvView() {
     fetchBoard();
     const interval = setInterval(fetchBoard, 3000);
     
-    socketRef.current = io("/");
+    socketRef.current = createSocket();
     socketRef.current.on("board_update", fetchBoard);
 
     return () => {
