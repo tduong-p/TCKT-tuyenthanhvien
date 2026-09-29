@@ -42,9 +42,13 @@ Không nằm trong phạm vi lần này (đã biết, chưa sửa): nhân sự d
   4. **Luồng phỏng vấn**: lễ tân check-in, người phỏng vấn gọi ứng viên, ứng viên chuyển trạng thái, chấm điểm, rồi đến board và TV board.
   5. **Chấm điểm theo config**: điểm ngoài `[min,max]`, thiếu tiêu chí, `result` không có trong config, và điểm trung bình tính đúng.
   6. **Dữ liệu cho xuất Excel**: `/api/evaluations` (chỉ admin) trả về đủ các trường mà `AdminView.jsx` cần để xuất file.
-  7. **Socket**: kết nối không có token hoặc token sai thì bị từ chối; token đúng thì nhận được `board_update` và `candidate_assigned`.
+  7. **Socket**: kết nối không có token vẫn được chấp nhận, vì TV và board công khai cần nhận `board_update`. Tuy nhiên mọi *hành động* (`candidate_checkin`, `interviewer_confirm_presence`, `user_online`) từ socket không có token hoặc token sai đều bị bỏ qua. Ứng viên chỉ check-in được cho chính mình. Với token đúng, hành động có hiệu lực và client nhận được `board_update`, `candidate_assigned`.
   8. **Admin**: thêm, sửa, xoá user; `clean-data` với sai mật khẩu và đúng mật khẩu.
 - Nếu tìm thấy bug: viết test tái hiện (phải thấy test fail trước), sửa code, rồi chạy lại toàn bộ test (TDD). Mỗi bug sửa trong một commit riêng.
+
+## 4b. Health endpoint
+
+Thêm route `GET /api/public/health`, công khai (đưa vào whitelist của `authMiddleware`). Route trả `200 {"ok":true}` khi `mongoose.connection.readyState === 1`, còn lại trả `503 {"ok":false}`. Route này dùng cho HEALTHCHECK của image, smoke test trên CI và `compose up --wait`. Lý do: server vẫn chạy và `/api/public/config` vẫn trả 200 ngay cả khi mất kết nối Mongo.
 
 ## 5. Image Docker
 
@@ -58,7 +62,7 @@ FROM node:20-slim                  # runtime
   COPY backend/ (kèm node_modules từ stage deps), frontend/dist, config/
   USER node
   EXPOSE 5000
-  HEALTHCHECK CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||5000)+'/api/public/config').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  HEALTHCHECK CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||5000)+'/api/public/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
   CMD ["node","backend/server.js"]
 ```
 
@@ -81,10 +85,10 @@ FROM node:20-slim                  # runtime
 
 - `mongo`: dùng `mongo:8` (có image arm64; Neoverse-N1 là ARMv8.2, đủ yêu cầu). Chạy với `--wiredTigerCacheSizeGB 0.25`, `mem_limit: 768m`, **không publish port**. Có `MONGO_INITDB_ROOT_USERNAME/PASSWORD` lấy từ `.env`, healthcheck bằng `mongosh --eval "db.adminCommand('ping')"`, và `restart: unless-stopped`.
 - `app`: dùng `ghcr.io/…:${IMAGE_TAG:-fofl}`, cổng `127.0.0.1:5000:5000`, `env_file: .env`, `mem_limit: 384m`, `restart: unless-stopped`, `depends_on: mongo (service_healthy)`. Có sẵn một dòng volume mount đè config, để dạng comment.
-- `MONGODB_URI=mongodb://<user>:<pass>@mongo:27017/interview?authSource=admin`, đặt trong `.env`.
+- `MONGODB_URI` **không** đặt trong `.env`. Compose tự tạo chuỗi `mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/interview?authSource=admin` trong phần `environment:` của service `app`. Mật khẩu được sinh dạng hex nên không cần URL-encode.
 - Dùng network mặc định của project. Không có port nào mở ra ngoài, ngoài `127.0.0.1:5000`.
 
-Mẫu `.env` cho VM: `deploy/.env.example`, gồm `MONGO_ROOT_USER`, `MONGO_ROOT_PASSWORD`, `MONGODB_URI`, `JWT_SECRET`, `STAFF_PASSWORD` và `ADMIN_CLEAN_PASSWORD`.
+Mẫu `.env` cho VM: `deploy/.env.example`, gồm `IMAGE_TAG`, `MONGO_ROOT_USER`, `MONGO_ROOT_PASSWORD`, `JWT_SECRET`, `STAFF_PASSWORD` và `ADMIN_CLEAN_PASSWORD`.
 
 ## 7. nginx + certbot
 
@@ -98,12 +102,12 @@ Mẫu `.env` cho VM: `deploy/.env.example`, gồm `MONGO_ROOT_USER`, `MONGO_ROOT
 
 ## 8. CI/CD — `.github/workflows/deploy.yml`
 
-- Trigger: `push` lên `fofl` và `workflow_dispatch`. Có `concurrency: deploy-fofl` để các lần deploy không chạy chồng lên nhau.
+- Trigger: `push` lên **mọi nhánh** và `workflow_dispatch`. Build và smoke test chạy trên mọi nhánh, vì trên máy dev không có Docker. **Chỉ khi `github.ref == 'refs/heads/fofl'`** thì mới push lên GHCR và chạy job `deploy`. Có `concurrency: deploy-${{ github.ref }}` để các lần chạy trên cùng một nhánh không chồng lên nhau.
 - Permissions: `contents: read` và `packages: write`.
 - **Job `build`** chạy trên `ubuntu-24.04-arm`:
   1. checkout, rồi `docker/setup-buildx-action`.
   2. Build với `load: true`, cache `type=gha`.
-  3. **Smoke test**: `docker network create`, chạy `mongo:8`, chạy image vừa build với env test, chờ trạng thái `healthy` (tối đa 60 giây), rồi `curl` kiểm tra `/api/public/config` trả 200 và `/api/users` trả 401.
+  3. **Smoke test**: `docker network create`, chạy `mongo:8`, chạy image vừa build với env test, chờ trạng thái `healthy` (tối đa 60 giây), rồi `curl` kiểm tra `/api/public/health` trả 200, `/api/public/config` trả 200, `/` trả về HTML và `/api/users` trả 401.
   4. Đăng nhập GHCR bằng `GITHUB_TOKEN`, rồi push 2 tag `:${{ github.sha }}` và `:fofl`.
 - **Job `deploy`** (`needs: build`, environment `production`):
   1. Ghi `VM_SSH_KEY` ra file và thêm `VM_HOST` vào `known_hosts` bằng `ssh-keyscan`.
