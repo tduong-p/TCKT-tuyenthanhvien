@@ -11,11 +11,12 @@ const Candidate = require('./models/Candidate');
 const User = require('./models/User');
 const Evaluation = require('./models/Evaluation');
 const Message = require('./models/Message');
+const candidateImporter = require('./importers/candidates');
 const { config: orgConfig, ASSETS_DIR, defaultDepartment, isValidDepartment, isValidResult, getCandidateName } = require('./config');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '5mb' })); // admin Excel import sends a few thousand rows as JSON
 // Express 5 leaves req.body undefined when nothing was parsed; handlers destructure it
 app.use((req, res, next) => { if (req.body === undefined) req.body = {}; next(); });
 
@@ -762,6 +763,72 @@ app.delete('/api/users/:username', requireStaff('admin'), async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+// --- Admin Excel import/export (the browser parses/builds the .xlsx, the server sees JSON rows) ---
+const importError = (res, p) => res.status(p.status || 400).json({ success: false, message: p.error });
+const rowsGiven = rows => Array.isArray(rows) && rows.length > 0;
+
+app.post('/api/admin/import/candidates', async (req, res) => {
+  try {
+    const { department, codeColumn, rows, replace, dryRun } = req.body;
+    if (!rowsGiven(rows)) return importError(res, { error: 'File không có dòng dữ liệu nào' });
+    const opts = { department, codeColumn: codeColumn || undefined, rows, replace: !!replace };
+    // The confirm step re-plans against the current database instead of trusting the preview
+    const p = await candidateImporter.plan(opts);
+    if (p.error) return importError(res, p);
+    if (dryRun) {
+      return res.json({
+        success: true, dryRun: true,
+        create: p.create.length, update: p.update.length, unchanged: p.unchanged, skipped: p.skipped, remove: p.remove,
+        preview: { create: p.create.map(c => c.interviewCode), update: p.update.map(c => c.interviewCode) },
+      });
+    }
+    const done = await candidateImporter.apply(department, p);
+    io.emit('board_update');
+    res.json({ success: true, ...done, unchanged: p.unchanged, skipped: p.skipped });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+const HT = candidateImporter.SYSTEM_PREFIX;
+const CANDIDATE_SYSTEM_COLUMNS = ['Đơn vị', 'Trạng thái', 'Giờ check-in', 'Phòng', 'Bàn', 'Người phỏng vấn', 'Điểm TB', 'Kết quả'].map(c => HT + c);
+
+app.get('/api/admin/export/candidates', async (req, res) => {
+  try {
+    const { department } = req.query;
+    const candidates = await Candidate.find(department ? { department } : {}).sort({ department: 1, interviewCode: 1 }).lean();
+    const evaluations = await Evaluation.find({ interviewCode: { $in: candidates.map(c => c.interviewCode) } }).sort({ createdAt: 1 }).lean();
+    const latestEval = new Map(evaluations.map(e => [`${e.department}:${e.interviewCode}`, e])); // later ones overwrite
+    const names = new Map((await User.find().select('username fullName').lean()).map(u => [u.username, u.fullName]));
+
+    // Columns in order of first appearance; the code column leads so the file re-imports as is
+    const codeLabel = orgConfig.candidate.codeLabel;
+    const dataColumns = [];
+    for (const c of candidates) for (const k of Object.keys(c.applicationData || {})) if (!dataColumns.includes(k)) dataColumns.push(k);
+    const columns = [codeLabel, ...dataColumns.filter(k => k !== codeLabel), ...CANDIDATE_SYSTEM_COLUMNS];
+
+    const rows = candidates.map(c => {
+      const e = latestEval.get(`${c.department}:${c.interviewCode}`);
+      const checkIn = c.checkInTime && new Date(c.checkInTime).getTime() > 0 ? new Date(c.checkInTime).toISOString() : '';
+      return {
+        ...c.applicationData,
+        [codeLabel]: (c.applicationData && c.applicationData[codeLabel]) || c.interviewCode,
+        [HT + 'Đơn vị']: c.department,
+        [HT + 'Trạng thái']: c.status,
+        [HT + 'Giờ check-in']: checkIn,
+        [HT + 'Phòng']: c.assignedRoom || '',
+        [HT + 'Bàn']: c.assignedTable || '',
+        [HT + 'Người phỏng vấn']: e ? (names.get(e.interviewerUsername) || e.interviewerUsername) : '',
+        [HT + 'Điểm TB']: e ? e.averageScore : '',
+        [HT + 'Kết quả']: e ? e.result : '',
+      };
+    });
+    res.json({ columns, rows });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // Serve static frontend files
 const buildPath = path.join(__dirname, '../frontend/dist');
 app.use(express.static(buildPath));
