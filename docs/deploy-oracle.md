@@ -20,7 +20,7 @@ Internet ──443──▶ nginx (host) ──▶ 127.0.0.1:5000 app ──▶ 
 - Docker Engine và Docker Compose v2.
 - nginx và certbot (gói `python3-certbot-nginx`) chạy trên host.
 - Một tên miền trỏ về IP public của VM, ví dụ `fofl-k71-phongvan.duckdns.org`.
-- Quyền admin trên repo GitHub chạy CI. Chỉ admin mới tạo được environment, secret và đổi quyền hiển thị của package. Repo cá nhân không cho gán quyền admin cho collaborator, nên nếu bạn không phải chủ repo thì **fork** repo về tài khoản của mình và deploy từ fork. Image nằm ở `ghcr.io/<chủ repo chạy CI>/k71-interview-system`; CI tự ghi `IMAGE` và `IMAGE_TAG` vào `.env`.
+- Quyền admin trên repo GitHub chạy CI. Chỉ admin mới tạo được environment, secret và đổi quyền hiển thị của package. Repo cá nhân không cho gán quyền admin cho collaborator, nên nếu bạn không phải chủ repo thì **fork** repo về tài khoản của mình và deploy từ fork. Image nằm ở `ghcr.io/<chủ repo chạy CI>/<tên repo viết thường>`; CI tự ghi `IMAGE` và `IMAGE_TAG` vào `.env`.
 
 ## 2. Setup VM lần đầu
 
@@ -69,7 +69,7 @@ mkdir -p /opt/interview/data/mongo /opt/interview/backups
 cd /opt/interview
 umask 077
 cat > .env <<EOF
-IMAGE=ghcr.io/<owner>/k71-interview-system
+IMAGE=ghcr.io/<owner>/<repo>
 IMAGE_TAG=fofl
 MONGO_ROOT_USER=interview_root
 MONGO_ROOT_PASSWORD=$(openssl rand -hex 24)
@@ -146,7 +146,7 @@ Theo dõi ở tab *Actions*. Job deploy làm các việc sau:
 
 Job không bao giờ chạy `docker system prune` trên toàn host.
 
-**Lần deploy đầu tiên.** Mặc định GHCR để package ở chế độ private, nên lần đầu VM có thể pull thất bại với lỗi `denied`. Khi đó, admin repo vào *github.com → Packages → k71-interview-system → Package settings → Change visibility → Public*, rồi chạy lại job.
+**Lần deploy đầu tiên.** Mặc định GHCR để package ở chế độ private, nên lần đầu VM có thể pull thất bại với lỗi `denied`. Khi đó, admin repo vào *github.com → Packages → <tên repo> → Package settings → Change visibility → Public*, rồi chạy lại job.
 
 **Rollback** về bản trước, chạy trên VM (image cũ vẫn còn trên máy nên không cần pull):
 
