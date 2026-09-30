@@ -1,4 +1,6 @@
-# TÀI LIỆU HƯỚNG DẪN SỬ DỤNG HỆ THỐNG ĐIỀU PHỐI PHỎNG VẤN K71
+# HƯỚNG DẪN SỬ DỤNG HỆ THỐNG PHỎNG VẤN
+
+**Liên chi Đoàn khoa Ngoại ngữ** · Tuyển nhân sự 2026–2027
 
 Tài liệu này cung cấp hướng dẫn chi tiết về cách vận hành hệ thống điều phối phỏng vấn dành cho tất cả các vai trò: **Quản trị viên (Admin)**, **Lễ tân (Receptionist)**, **Người phỏng vấn (Interviewer)** và **Ứng viên (Candidate)**.
 
@@ -25,7 +27,7 @@ Admin có toàn quyền quản lý hệ thống, từ nhân sự, danh sách ứ
 - **Xóa toàn bộ dữ liệu:** Nhấn nút **Xóa/Làm sạch** để reset toàn bộ hệ thống (xóa hết kết quả đánh giá, reset trạng thái ứng viên về ban đầu). Yêu cầu nhập mật khẩu bảo mật (Password làm sạch).
 
 ### 1.3. Theo dõi Bảng điều khiển (Dashboard)
-- Admin có thể theo dõi tiến độ tổng quan: số lượng người đang chờ, đang phỏng vấn, đã xong, theo từng ban.
+- Admin có thể theo dõi tiến độ tổng quan: số lượng người đang chờ, đang phỏng vấn, đã xong.
 - **Đổi vai trò:** Người được cấp từ 2 vai trò trở lên sẽ được hỏi *"Bạn muốn vào với vai trò nào?"* ngay sau khi đăng nhập. Sau đó có thể đổi bất cứ lúc nào bằng menu **Đổi vai trò** trên thanh công cụ (có ở cả trang Admin, Lễ tân và Người phỏng vấn). Chọn Người phỏng vấn thì phải nhập số phòng và số bàn. Rời vai trò Người phỏng vấn sẽ giải phóng bàn; hệ thống không cho đổi khi đang có ứng viên ở bàn — hãy hoàn tất phỏng vấn trước.
 
 ### 1.4. Xem Báo cáo & Đánh giá
@@ -41,14 +43,14 @@ Lễ tân là người bao quát tình hình tại khu vực chờ, hỗ trợ �
 
 ### 2.1. Quản lý Màn hình TV
 - Nhấn nút **Mở màn hình TV** để bật giao diện bảng hàng chờ lớn (Dashboard).
-- Giao diện này dùng để trình chiếu lên màn hình lớn/máy chiếu ở khu vực chờ để ứng viên tự theo dõi số thứ tự và trạng thái của mình.
+- Giao diện này dùng để trình chiếu lên màn hình lớn/máy chiếu ở khu vực chờ để ứng viên tự theo dõi số thứ tự và trạng thái của mình: ai **Đang gọi** (vào phòng/bàn nào) và danh sách **Sắp đến lượt**.
+- Phía trên màn hình TV có **mã QR**. Ứng viên quét mã bằng điện thoại để mở trang web hệ thống, đăng nhập bằng MSSV và tự check-in, xem thứ tự của mình.
 
 ### 2.2. Hỗ trợ Check-in hộ
 Nếu ứng viên không mang điện thoại hoặc không tự truy cập web được:
 1. Nhấn nút **Check-in Hộ**.
-2. Nhập chính xác **MSSV** (Mã sinh viên) của ứng viên.
-3. Chọn **Ban (TCKT / BCS)** mà ứng viên ứng tuyển.
-4. Bấm **Check-in**. Hệ thống sẽ đối chiếu MSSV này với danh sách của Ban đó. Nếu có thông tin, ứng viên sẽ được đưa vào hàng chờ. Nếu không có, hệ thống sẽ báo lỗi.
+2. Nhập chính xác **MSSV** (Mã sinh viên) của ứng viên. Gõ chữ thường cũng được, hệ thống tự đổi sang chữ hoa.
+3. Bấm **Check-in**. Hệ thống đối chiếu MSSV với danh sách ứng viên. Nếu có, ứng viên được đưa vào hàng chờ (thông báo *"Thành công!"*). Nếu không có, hệ thống báo **Lỗi**, hãy kiểm tra lại MSSV hoặc nhờ Admin thêm ứng viên.
 
 ---
 
@@ -67,23 +69,27 @@ Nếu ứng viên không mang điện thoại hoặc không tự truy cập web 
   - Một người **Rời bàn** hoặc đổi vai trò trong khi người kia vẫn ngồi thì ứng viên vẫn ở lại bàn; chỉ khi người cuối cùng rời bàn thì ứng viên mới được trả về hàng chờ.
 
 ### 3.2. Gọi ứng viên (2 Chế độ)
-- **Tự động gọi (Auto-assign):** Bật công tắc "Tự động gọi ứng viên". Cứ mỗi khi bàn của bạn trống, hệ thống sẽ tự động bốc ứng viên đang chờ lâu nhất vào bàn của bạn.
-- **Gọi thủ công:** Tắt tự động gọi. Ấn nút **Hàng chờ** và chủ động bấm "Gọi" một ứng viên cụ thể trong danh sách đang chờ.
+Nút chế độ nằm trên thanh tiêu đề; bấm vào để chuyển qua lại giữa hai chế độ. Khi mới vào bàn, chế độ mặc định là **Chọn thủ công**.
+
+- **Tự động gọi:** Nút hiện **Tự động gọi**. Cứ mỗi khi bàn của bạn trống, hệ thống tự động đưa ứng viên đang chờ lâu nhất vào bàn của bạn (chỉ vài giây sau khi bàn trống).
+- **Chọn thủ công:** Nút hiện **Chọn thủ công**. Bấm **Xem hàng chờ chung (N)** rồi bấm **GỌI** cạnh ứng viên muốn gọi.
 
 ### 3.3. Quy trình một phiên phỏng vấn
 1. **Chờ ứng viên di chuyển:** Sau khi được gọi, trạng thái ứng viên chuyển thành "Đang di chuyển". 
 2. **Xác nhận có mặt:** Khi ứng viên đã bước tới bàn, hãy bấm nút **XÁC NHẬN ĐÃ CÓ MẶT**.
-3. **Tiến hành phỏng vấn:** Màn hình sẽ hiện Hồ sơ/CV của ứng viên (cột bên trái) và Form Đánh giá (cột bên phải).
+3. **Tiến hành phỏng vấn:** Màn hình sẽ hiện **Thông tin Ứng viên** (các câu trả lời trong đơn đăng ký) và Form Đánh giá. Form chỉ hiện sau khi đã xác nhận có mặt.
 4. **Đánh giá:**
-   - Kéo thanh điểm (1-10) cho 3 tiêu chí: *Thái độ & Tác phong*, *Kỹ năng chuyên môn*, *Xử lý tình huống*.
-   - Nhập **Nhận xét chi tiết** vào khung chữ.
-   - Chọn một trong ba quyết định: **Đạt**, **Cân nhắc thêm**, hoặc **Không đạt**.
-5. **Hoàn tất:** Bấm **Hoàn tất đánh giá & Lưu**. Ứng viên này sẽ kết thúc và hệ thống tự động gọi ứng viên tiếp theo (nếu bật Auto-assign).
+
+    - Kéo thanh điểm (1-10) cho 3 tiêu chí: *Thái độ & Tác phong*, *Kỹ năng chuyên môn*, *Xử lý tình huống*.
+    - Nhập **Nhận xét chi tiết** vào khung chữ.
+    - Chọn một trong ba quyết định: **Đạt**, **Cân nhắc thêm**, hoặc **Không đạt**.
+
+5. **Hoàn tất:** Bấm **HOÀN TẤT & LƯU**. Ứng viên này kết thúc và hệ thống tự động gọi ứng viên tiếp theo (nếu đang ở chế độ Tự động gọi).
 
 ### 3.4. Các chức năng hỗ trợ khác
-- **Đổi trạng thái Bận/Nghỉ:** Gạt công tắc trạng thái ở góc phải để tạm nghỉ. Hệ thống sẽ không tự động gọi thêm ứng viên cho bạn.
-- **Rời bàn:** Bấm biểu tượng Cửa/Thoát để rời bàn (bạn sẽ cần chọn lại số bàn khi quay lại).
-- **Hủy phỏng vấn:** Nếu ứng viên được gọi mà bỏ về không tới bàn, bấm biểu tượng "X" (Hủy bỏ) để trả họ về hàng chờ, giải phóng bàn.
+- **Tạm nghỉ:** Bấm **Tạm Nghỉ** trên thanh tiêu đề. Màn hình hiện *"Bàn đang đóng"* và hệ thống không gọi thêm ứng viên cho bạn. Bấm **Quay lại Bàn** để mở lại.
+- **Rời bàn:** Bấm **Rời Bàn** rồi xác nhận **Rời đi**. Khi đăng nhập lại bạn phải nhập lại số phòng và số bàn.
+- **Hủy lượt:** Nếu ứng viên được gọi mà không tới bàn, bấm **Hủy lượt & Đưa về hàng chờ** rồi xác nhận **Huỷ lượt** để trả họ về hàng chờ, giải phóng bàn.
 - **Kênh Chat:** Sử dụng hộp Chat ở góc dưới bên phải để liên lạc nhanh với Admin, Lễ tân và các bàn phỏng vấn khác.
 
 ---
@@ -94,19 +100,20 @@ Nếu ứng viên không mang điện thoại hoặc không tự truy cập web 
 *Giao diện tại trang chủ hệ thống (Mặc định).*
 
 ### 4.1. Đăng nhập và Check-in
-1. Ứng viên truy cập trang web hệ thống.
-2. Nhập **MSSV** của mình.
-3. Nếu ứng viên ứng tuyển vào cả 2 ban, hệ thống sẽ hỏi ứng viên muốn check-in cho Ban nào trước.
-4. Đăng nhập thành công, ấn nút **XÁC NHẬN CHECK-IN** to đùng trên màn hình để báo danh. 
+1. Ứng viên truy cập trang web hệ thống (hoặc quét mã QR trên màn hình TV).
+2. Nhập **MSSV** của mình rồi bấm **TIẾP TỤC**.
+3. Kiểm tra màn hình **Xác nhận thông tin** (MSSV, họ và tên, ban ứng tuyển) rồi bấm **Xác nhận**. Sai thông tin thì bấm **Nhập lại**.
+4. Bấm nút **XÁC NHẬN CHECK-IN** trên màn hình để báo danh.
 
 ### 4.2. Theo dõi trạng thái
-- Màn hình điện thoại sẽ báo "Đang đợi tới lượt" và hiển thị số thứ tự.
+- Màn hình điện thoại hiện **Đang chờ** cùng **Thứ tự của bạn** trong hàng chờ.
 - Ứng viên có thể cất điện thoại hoặc nhìn lên màn hình TV lớn.
 
 ### 4.3. Di chuyển đến bàn
-- Khi được Lễ tân hoặc Người phỏng vấn gọi, điện thoại ứng viên sẽ **rung lên**, màn hình chuyển sang **màu xanh lá cây** và báo thông tin: *Vui lòng di chuyển đến PHÒNG X, BÀN Y*.
-- Ứng viên bấm nút **ĐÃ HIỂU, ĐANG DI CHUYỂN TỚI BÀN** trên điện thoại để thông báo mình đang đi tới.
-- Khi ứng viên đến bàn và người phỏng vấn ấn xác nhận, màn hình điện thoại ứng viên sẽ chuyển sang thông báo chúc thi tốt. 
+- Khi đến lượt, điện thoại **phát chuông báo**, nền màn hình **nháy đỏ** và hiện **ĐẾN LƯỢT BẠN!** kèm **Phòng** và **Bàn số** cần đến.
+- Ứng viên bấm **TÔI ĐÃ NHẬN THÔNG TIN** để báo đã thấy thông báo, rồi di chuyển tới bàn.
+- Khi người phỏng vấn xác nhận có mặt, điện thoại chuyển sang **ĐANG PHỎNG VẤN** kèm lời chúc. Phỏng vấn xong, điện thoại hiện **HOÀN TẤT**: ứng viên có thể ra về.
+- Ứng viên cần **giữ trang web mở** trong lúc chờ. Trên một số điện thoại (nhất là iPhone), trình duyệt có thể chặn chuông, nên hãy nhắc ứng viên để ý cả màn hình điện thoại và màn hình TV.
 
 ---
 
