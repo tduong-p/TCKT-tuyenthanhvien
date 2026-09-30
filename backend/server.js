@@ -431,8 +431,9 @@ app.post('/api/admin/clean-data', async (req, res) => {
   if (!expectedPassword) {
     return res.status(503).json({ success: false, message: 'Chưa cấu hình ADMIN_CLEAN_PASSWORD trên server.' });
   }
+  // 403, not 401: the frontend treats any 401 as "session expired" and logs the admin out
   if (!password || !safeEqual(password, expectedPassword)) {
-    return res.status(401).json({ success: false, message: 'Sai mật khẩu!' });
+    return res.status(403).json({ success: false, message: 'Sai mật khẩu!' });
   }
   try {
     await Evaluation.deleteMany({});
