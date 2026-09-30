@@ -43,7 +43,7 @@ const hasRole = (u, role) => !!u && (u.role === role || (Array.isArray(u.roles) 
 
 const authMiddleware = async (req, res, next) => {
   // Allow public/read-only routes without token
-  if (req.path === '/login' || req.path === '/tv-board' || req.path === '/board' || req.path === '/public/config') return next();
+  if (req.path === '/login' || req.path === '/tv-board' || req.path === '/board' || req.path === '/public/config' || req.path === '/public/health') return next();
   
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -86,6 +86,12 @@ app.use('/org-assets', express.static(ASSETS_DIR));
 
 app.get('/api/public/config', (req, res) => {
   res.json(orgConfig);
+});
+
+// Used by the Docker HEALTHCHECK: unhealthy while MongoDB is unreachable
+app.get('/api/public/health', (req, res) => {
+  const ok = mongoose.connection.readyState === 1;
+  res.status(ok ? 200 : 503).json({ ok });
 });
 
 const server = http.createServer(app);
@@ -224,7 +230,10 @@ io.on('connection', (socket) => {
 // Unified Login API
 app.post('/api/login', async (req, res) => {
   let { code, tableNumber, roomNumber, department } = req.body;
-  if (code) code = code.trim().toUpperCase(); 
+  if (typeof code !== 'string' || !code.trim()) {
+    return res.status(400).json({ success: false, message: 'Thiếu mã đăng nhập' });
+  }
+  code = code.trim().toUpperCase();
   
   try {
     // 1. Check if Candidate
