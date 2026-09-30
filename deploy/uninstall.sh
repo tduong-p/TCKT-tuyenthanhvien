@@ -4,7 +4,7 @@
 #   ./uninstall.sh             ask for confirmation, then run
 #   ./uninstall.sh --force     also proceed when mongo is down and no dump exists (database is lost)
 # Touches only: $INTERVIEW_DIR (default /opt/interview), the "interview" compose project and this
-# repo's images, the "# interview-backup" crontab line, nginx site interview.conf, certbot cert "interview".
+# repo's images, the "# interview-backup" and "# interview-results" crontab lines, nginx site interview.conf, certbot cert "interview".
 set -euo pipefail
 
 DIR=${INTERVIEW_DIR:-/opt/interview}
@@ -69,11 +69,11 @@ if [[ -d "$DIR" ]]; then
   cd /
 fi
 
-# 3. Backup cron line
+# 3. Backup cron lines
 cron=$(crontab -l 2>/dev/null || true)
-if grep -q '# interview-backup' <<<"$cron"; then
-  echo "+ crontab: remove line tagged # interview-backup"
-  if [[ $DRY -eq 0 ]]; then { grep -v '# interview-backup' <<<"$cron" || true; } | crontab -; fi
+if grep -qE '# interview-(backup|results)' <<<"$cron"; then
+  echo "+ crontab: remove lines tagged # interview-backup / # interview-results"
+  if [[ $DRY -eq 0 ]]; then { grep -vE '# interview-(backup|results)' <<<"$cron" || true; } | crontab -; fi
 fi
 
 # 4. nginx site

@@ -104,6 +104,33 @@ Tham số `--cert-name interview` cho stack này một chứng chỉ riêng, kh�
 
 Job này chạy lúc 03:15 mỗi ngày và giữ lại 14 bản mới nhất. Dòng cron có tag `# interview-backup` để `uninstall.sh` tìm và xoá đúng dòng này.
 
+### 2.7 Sao lưu liên tục kết quả ra GitHub
+
+`export-results.sh` xuất các bảng `evaluations`, `candidates`, `users` thành JSON (mỗi bản ghi một dòng) vào `/opt/interview/results-backup/`. Script chỉ commit khi dữ liệu thay đổi, rồi push lên một repo **private** riêng. Cron chạy script 2 phút một lần. Push lỗi (mất mạng) thì commit vẫn nằm trên VM, lần chạy sau đẩy bù. Lịch sử git giữ mọi phiên bản, nên kể cả sau khi "Làm sạch dữ liệu" vẫn lấy lại được dữ liệu cũ.
+
+Repo này chứa dữ liệu cá nhân của ứng viên: để private và chỉ cấp quyền cho người trong ban.
+
+1. Tạo repo private rỗng, ví dụ `<owner>/fofl-interview-backup`.
+2. Trên VM, tạo deploy key. Khoá bí mật nằm trong `/opt/interview` nên `uninstall.sh` xoá cùng:
+
+   ```bash
+   ssh-keygen -t ed25519 -N '' -C interview-results -f /opt/interview/results-key
+   cat /opt/interview/results-key.pub
+   ```
+
+3. Thêm khoá công khai vào repo ở *Settings → Deploy keys*, **bật "Allow write access"**. Hoặc từ máy có `gh`: `gh repo deploy-key add results-key.pub --repo <owner>/fofl-interview-backup --allow-write --title interview-vm`.
+4. Clone repo và bật cron:
+
+   ```bash
+   cd /opt/interview
+   GIT_SSH_COMMAND="ssh -i $PWD/results-key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
+     git clone git@github.com:<owner>/fofl-interview-backup.git results-backup
+   ./export-results.sh
+   ( crontab -l 2>/dev/null; echo '*/2 * * * * /opt/interview/export-results.sh >> /opt/interview/backups/results.log 2>&1 # interview-results' ) | crontab -
+   ```
+
+Log nằm ở `/opt/interview/backups/results.log`: mỗi lần push có một dòng `pushed <commit>`, lỗi cũng ghi vào đây. Sau khi gỡ hệ thống, nhớ xoá deploy key trên GitHub.
+
 ## 3. Key CI và secret trên GitHub
 
 1. Tạo một key riêng cho CI, trên máy của bạn (không phải trên VM):
@@ -199,6 +226,15 @@ cd /opt/interview
 docker compose exec -T mongo sh -c 'mongorestore --archive --gzip --drop \
   -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin' \
   < backups/<file>.archive.gz
+```
+
+**Khôi phục từ repo sao lưu kết quả.** Lấy file JSON ở thời điểm muốn quay về (ví dụ `git -C results-backup show <commit>:evaluations.json > /tmp/evaluations.json`), rồi nạp đè từng bảng. Lệnh dưới đây xoá bảng hiện tại trước khi nạp:
+
+```bash
+cd /opt/interview
+docker compose exec -T mongo sh -c 'mongoimport --quiet --drop --db interview --collection evaluations \
+  -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin' \
+  < /tmp/evaluations.json
 ```
 
 ## 7. Gỡ bỏ

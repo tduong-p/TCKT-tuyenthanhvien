@@ -110,7 +110,7 @@ jobs:
       - name: Copy stack files
         env:
           TARGET: ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}
-        run: scp deploy/compose.yml deploy/backup.sh deploy/uninstall.sh deploy/remote-deploy.sh "$TARGET:/opt/interview/"
+        run: scp deploy/compose.yml deploy/backup.sh deploy/export-results.sh deploy/uninstall.sh deploy/remote-deploy.sh "$TARGET:/opt/interview/"
 
       - name: Deploy
         env:
