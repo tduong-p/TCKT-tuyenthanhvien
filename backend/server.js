@@ -16,6 +16,8 @@ const { config: orgConfig, ASSETS_DIR, defaultDepartment, isValidDepartment, isV
 const app = express();
 app.use(cors());
 app.use(express.json());
+// Express 5 leaves req.body undefined when nothing was parsed; handlers destructure it
+app.use((req, res, next) => { if (req.body === undefined) req.body = {}; next(); });
 
 const jwt = require('jsonwebtoken');
 const IS_PROD = process.env.NODE_ENV === 'production';
@@ -105,7 +107,11 @@ const io = new Server(server, {
 const mongoURI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/interview';
 mongoose.connect(mongoURI)
   .then(() => console.log('MongoDB connected'))
-  .catch(err => console.log('MongoDB connection error:', err));
+  .catch(err => {
+    // Exit so the container restart policy retries; mongoose does not retry a failed first connect
+    console.log('MongoDB connection error:', err);
+    process.exit(1);
+  });
 
 // Auto assignment logic
 const assignCandidates = async () => {
