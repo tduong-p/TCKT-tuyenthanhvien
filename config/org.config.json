@@ -1,32 +1,26 @@
 {
-  "appTitle": "TUYỂN THÀNH VIÊN",
-  "systemName": "Hệ thống phỏng vấn",
+  "appTitle": "TUYỂN NHÂN SỰ",
+  "systemName": "Hệ thống phỏng vấn - Liên chi Đoàn khoa Ngoại ngữ",
 
   "branding": {
-    "favicon": "/org-assets/tckt_logo.png",
-    "background": "/org-assets/bg_k71.png",
-    "qrImage": "/org-assets/qr.jpeg",
+    "favicon": "",
+    "background": "/org-assets/bg_fofl.png",
+    "qrImage": "",
     "decorations": [
+      "/org-assets/props/nn_1.png",
+      "/org-assets/props/nn_2.png",
+      "/org-assets/props/nn_3.png",
+      "/org-assets/props/nn_4.png",
+      "/org-assets/props/nn_5.png",
       "/org-assets/props/prop_19.png",
-      "/org-assets/props/prop_18.png",
-      "/org-assets/props/prop_12.png",
-      "/org-assets/props/prop_11.png",
-      "/org-assets/props/prop_15.png",
-      "/org-assets/props/prop_10.png",
-      "/org-assets/props/prop_9.png",
-      "/org-assets/props/prop_14.png",
-      "/org-assets/props/prop_7.png",
-      "/org-assets/props/prop_17.png",
-      "/org-assets/props/prop_8.png",
-      "/org-assets/props/prop_16.png"
+      "/org-assets/props/prop_18.png"
     ]
   },
 
   "footer": {
-    "heading": "DYC x Ban Tổ chức - Kiểm tra",
+    "heading": "Liên chi Đoàn khoa Ngoại ngữ",
     "logos": [
-      { "src": "/org-assets/dyc_logo.png", "alt": "DYC Logo", "href": "https://web.facebook.com/dyc.hust" },
-      { "src": "/org-assets/tckt_logo.png", "alt": "Ban TC-KT Logo", "href": "https://web.facebook.com/BanTCKT.HUST" }
+      { "src": "/org-assets/KNN_logo.png", "alt": "Khoa Ngoại ngữ - Đại học Bách khoa Hà Nội" }
     ],
     "creditsPrefix": "Đây là một sản phẩm của",
     "credits": [
@@ -46,19 +40,11 @@
   "departments": [
     {
       "code": "TCKT",
-      "shortName": "Ban TCKT",
-      "name": "Ban Tổ chức - Kiểm tra",
-      "titleImage": "/org-assets/title_k71.png",
-      "tvTitleScale": 3,
+      "shortName": "LCĐ Ngoại ngữ",
+      "name": "Liên chi Đoàn khoa Ngoại ngữ",
+      "titleImage": "/org-assets/title_nn.png",
+      "tvTitleScale": 2,
       "theme": "blue"
-    },
-    {
-      "code": "BCS",
-      "shortName": "Ban Cán sự",
-      "name": "Ban Cán sự năm nhất",
-      "titleImage": "/org-assets/title_bcs.png",
-      "tvTitleScale": 3,
-      "theme": "emerald"
     }
   ],
 
