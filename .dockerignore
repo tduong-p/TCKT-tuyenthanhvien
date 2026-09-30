@@ -1,0 +1,17 @@
+**/node_modules
+frontend/dist
+.git
+.github
+.superpowers
+**/.env
+**/.env.*
+*.doc
+*.docx
+*.xlsx
+Theme
+huong_dan_su_dung_files
+huong_dan_su_dung.md
+docs
+deploy
+Dockerfile
+.dockerignore
