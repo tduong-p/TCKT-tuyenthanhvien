@@ -82,7 +82,7 @@ chmod 600 .env
 
 Mẫu các biến nằm ở [`deploy/.env.example`](../deploy/.env.example). Để xem mật khẩu nhân sự và phát cho mọi người, chạy `grep STAFF_PASSWORD /opt/interview/.env`.
 
-`compose.yml`, `backup.sh` và `uninstall.sh` do CI chép lên mỗi lần deploy. Vì vậy chỉ `.env` là do người quản trị tự quản lý.
+`compose.yml`, `backup.sh`, `uninstall.sh` và `remote-deploy.sh` do CI chép lên mỗi lần deploy. Vì vậy chỉ `.env` là do người quản trị tự quản lý.
 
 ### 2.5 nginx và HTTPS
 
@@ -139,9 +139,8 @@ git checkout fofl && git merge <nhánh> && git push origin fofl
 ```
 
 Theo dõi ở tab *Actions*. Job deploy làm các việc sau:
-- ghi `IMAGE_TAG=<sha>` vào `.env`,
-- lưu tag cũ vào `.prev_tag`,
-- chạy `docker compose pull` rồi `docker compose up -d --wait`,
+- chạy `remote-deploy.sh` trên VM: ghi `IMAGE`/`IMAGE_TAG=<sha>` vào `.env`, rồi chạy `docker compose pull` và `docker compose up -d --wait`,
+- nếu app không healthy trong 120 giây, tự quay về tag cũ và báo job thất bại; `.prev_tag` chỉ được cập nhật khi deploy thành công,
 - xoá image cũ của repo này, giữ lại tag hiện tại, tag `fofl` và tag trước đó.
 
 Job không bao giờ chạy `docker system prune` trên toàn host.
@@ -208,8 +207,8 @@ docker compose exec -T mongo sh -c 'mongorestore --archive --gzip --drop \
 ```
 
 Script làm lần lượt các bước sau:
-1. Backup lần cuối và chép ra `~/interview-final-backup-*.archive.gz`.
-2. `docker compose down -v --rmi all`.
+1. Backup lần cuối và chép ra `~/interview-final-backup-*.archive.gz`. Nếu mongo không chạy, script chép bản dump mới nhất đã có; nếu không có bản nào thì dừng lại, trừ khi thêm `--force`.
+2. `docker compose down -v`, rồi xoá các image của repo này và `mongo:8` (bỏ qua nếu dự án khác đang dùng `mongo:8`).
 3. Xoá dòng cron `# interview-backup`.
 4. Xoá site nginx `interview.conf` rồi reload nginx.
 5. Xoá chứng chỉ certbot `interview`.
@@ -220,7 +219,7 @@ Script không đụng tới Docker, nginx hay chứng chỉ của dự án khác
 **Gỡ bằng tay**, nếu script không dùng được:
 
 ```bash
-cd /opt/interview && docker compose down -v --rmi all
+cd /opt/interview && docker compose down -v && docker image rm $(docker image ls "$(sed -n 's/^IMAGE=//p' .env)" -q | sort -u)
 crontab -l | grep -v '# interview-backup' | crontab -
 sudo rm /etc/nginx/sites-enabled/interview.conf /etc/nginx/sites-available/interview.conf && sudo systemctl reload nginx
 sudo certbot delete --cert-name interview
