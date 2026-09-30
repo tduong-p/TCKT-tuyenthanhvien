@@ -12,6 +12,7 @@ const User = require('./models/User');
 const Evaluation = require('./models/Evaluation');
 const Message = require('./models/Message');
 const candidateImporter = require('./importers/candidates');
+const staffImporter = require('./importers/staff');
 const { config: orgConfig, ASSETS_DIR, defaultDepartment, isValidDepartment, isValidResult, getCandidateName } = require('./config');
 
 const app = express();
@@ -742,7 +743,7 @@ app.post('/api/users/add', requireStaff('admin'), async (req, res) => {
       fullName: fullName || username,
       department: department || defaultDepartment,
       roles: roles || ["interviewer"],
-      role: (roles && roles.length > 0) ? roles[0] : "interviewer"
+      role: staffImporter.pickRole(roles && roles.length ? roles : ["interviewer"])
     });
     await u.save();
     res.json({ success: true, user: u });
@@ -785,6 +786,39 @@ app.post('/api/admin/import/candidates', async (req, res) => {
     const done = await candidateImporter.apply(department, p);
     io.emit('board_update');
     res.json({ success: true, ...done, unchanged: p.unchanged, skipped: p.skipped });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/admin/import/staff', async (req, res) => {
+  try {
+    const { rows, removeMissing, dryRun } = req.body;
+    if (!rowsGiven(rows)) return importError(res, { error: 'File không có dòng dữ liệu nào' });
+    const p = await staffImporter.plan({ rows, removeMissing: !!removeMissing, actor: req.staff.username });
+    if (p.error) return importError(res, p);
+    if (dryRun) {
+      return res.json({
+        success: true, dryRun: true,
+        create: p.create.length, update: p.update.length, unchanged: p.unchanged, skipped: p.skipped, remove: p.remove,
+        preview: { create: p.create.map(u => u.username), update: p.update.map(u => u.username) },
+      });
+    }
+    const done = await staffImporter.apply(p);
+    io.emit('staff_update');
+    res.json({ success: true, ...done, unchanged: p.unchanged, skipped: p.skipped });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.get('/api/admin/export/staff', async (req, res) => {
+  try {
+    const users = await User.find().sort({ department: 1, username: 1 }).lean();
+    res.json({
+      columns: ['username', 'fullName', 'department', 'roles'],
+      rows: users.map(u => ({ username: u.username, fullName: u.fullName, department: u.department, roles: (u.roles || []).join(',') })),
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
