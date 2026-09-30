@@ -58,21 +58,21 @@ export default function TvView() {
   );
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-slate-900 font-sans flex flex-col items-center">
+    <div className="tv-page flex-1 min-h-0 relative overflow-hidden bg-slate-900 font-sans flex flex-col items-center">
       <MacBackground />
 
-      {config.branding.qrImage && <div className="w-full flex justify-center py-6 z-20 bg-slate-900/80 backdrop-blur-md border-b border-white/10 shrink-0">
-        <div className="flex items-center gap-10 bg-white p-6 rounded-[2.5rem] shadow-[0_0_50px_rgba(255,255,255,0.2)]">
+      {config.branding.qrImage && <div className="w-full flex justify-center py-4 z-20 bg-slate-900/80 backdrop-blur-md border-b border-white/10 shrink-0">
+        <div className="flex items-center gap-10 bg-white p-4 rounded-[2.5rem] shadow-[0_0_50px_rgba(255,255,255,0.2)]">
           <div className="text-center pr-10 border-r-2 border-slate-200">
             <h1 className="text-5xl font-black text-slate-800 uppercase tracking-widest mb-2">Quét mã QR</h1>
             <p className="text-slate-500 font-bold text-xl">để xem thứ tự của bạn</p>
           </div>
-          <img src={config.branding.qrImage} alt="QR Code" className="w-56 h-56 rounded-3xl object-contain border-4 border-slate-100 shadow-inner" />
+          <img src={config.branding.qrImage} alt="QR Code" className="w-44 h-44 rounded-3xl object-contain border-4 border-slate-100 shadow-inner" />
         </div>
       </div>}
 
       <div
-        className="flex-1 w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:[grid-template-columns:var(--tv-cols)] gap-6 z-10 h-[calc(100vh-200px)] overflow-hidden"
+        className="flex-1 w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:[grid-template-columns:var(--tv-cols)] auto-rows-[minmax(0,1fr)] gap-6 z-10 min-h-0 overflow-hidden"
         style={{ '--tv-cols': `repeat(${departments.length}, minmax(0, 1fr))` }}
       >
         {departments.map(dept => {
@@ -81,7 +81,7 @@ export default function TvView() {
           const allWaiting = boardData.waiting.filter(c => inDepartment(c, dept.code));
           const waiting = allWaiting.slice(0, 8);
           return (
-            <div key={dept.code} className={`flex flex-col bg-gradient-to-br ${theme.panel} backdrop-blur-2xl rounded-[3rem] border p-6 overflow-hidden`}>
+            <div key={dept.code} className={`flex flex-col bg-gradient-to-br ${theme.panel} backdrop-blur-2xl rounded-[3rem] border p-6 min-h-0 overflow-hidden`}>
               {/* 1. Title */}
               <div className="h-[15%] flex justify-center items-center shrink-0 mb-0">
                 {dept.titleImage ? (

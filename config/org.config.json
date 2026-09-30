@@ -5,7 +5,7 @@
   "branding": {
     "favicon": "",
     "background": "/org-assets/bg_fofl.png",
-    "qrImage": "",
+    "qrImage": "/org-assets/qr_fofl.png",
     "decorations": [
       "/org-assets/props/nn_1.png",
       "/org-assets/props/nn_2.png",

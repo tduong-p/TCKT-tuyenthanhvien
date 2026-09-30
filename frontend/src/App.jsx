@@ -16,8 +16,9 @@ function App() {
     <ErrorBoundary>
       <Toaster position="top-right" />
       <Router>
-      <div className="flex flex-col min-h-screen">
-        <div className="flex-1 flex flex-col">
+      {/* The TV page is locked to the screen height (with the footer), the other pages grow */}
+      <div className="flex flex-col min-h-screen has-[.tv-page]:h-screen">
+        <div className="flex-1 flex flex-col min-h-0">
           <Routes>
             <Route path="/" element={<Login />} />
             <Route path="/board" element={<Board />} />
