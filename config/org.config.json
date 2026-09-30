@@ -20,7 +20,9 @@
   "footer": {
     "heading": "Liên chi Đoàn khoa Ngoại ngữ",
     "logos": [
-      { "src": "/org-assets/KNN_logo.png", "alt": "Liên chi Đoàn khoa Ngoại ngữ", "href": "https://www.facebook.com/lcdknnhust" }
+      { "src": "/org-assets/KNN_logo.png", "alt": "Liên chi Đoàn khoa Ngoại ngữ", "href": "https://www.facebook.com/lcdknnhust" },
+      { "src": "/org-assets/dyc_logo.png", "alt": "DYC Logo", "href": "https://web.facebook.com/dyc.hust" },
+      { "src": "/org-assets/tckt_logo.png", "alt": "Ban TC-KT Logo", "href": "https://web.facebook.com/BanTCKT.HUST" }
     ],
     "creditsPrefix": "Đây là một sản phẩm của",
     "credits": [
