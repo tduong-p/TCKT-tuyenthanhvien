@@ -132,7 +132,7 @@ export default function Board({ hideHeader, department, isAdmin, onRemoveCandida
                     <CheckCircle2 size={20} />
                   </span>
                 </div>
-              ))}\
+              ))}
             </div>
           </div>
 
