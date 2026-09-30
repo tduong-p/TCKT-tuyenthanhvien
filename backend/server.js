@@ -685,12 +685,31 @@ app.post('/api/staff/switch-role', requireStaff(), async (req, res) => {
       return res.status(403).json({ success: false, message: 'Not allowed to switch to this role' });
     }
 
+    const table = String(tableNumber ?? '').trim();
+    const room = String(roomNumber ?? '').trim();
+    if (targetRole === 'interviewer' && (!table || !room)) {
+      return res.status(400).json({ success: false, message: 'Vui lòng nhập số phòng và số bàn' });
+    }
+
+    if (user.role === 'interviewer' && targetRole !== 'interviewer') {
+      // Leaving the interviewer seat: refuse mid-interview, otherwise free the table so auto-assign skips it
+      const busy = user.status === 'interviewing' || (user.tableNumber && user.roomNumber && await Candidate.exists({
+        assignedTable: user.tableNumber, assignedRoom: user.roomNumber, department: user.department, status: { $in: ['moving', 'interviewing'] },
+      }));
+      if (busy) return res.status(409).json({ success: false, message: 'Đang có ứng viên ở bàn, hãy hoàn tất trước khi đổi vai trò' });
+      user.tableNumber = null;
+      user.roomNumber = null;
+      user.status = 'active';
+    }
+
     user.role = targetRole;
     if (targetRole === 'interviewer') {
-      if (tableNumber) user.tableNumber = String(tableNumber).trim();
-      if (roomNumber) user.roomNumber = String(roomNumber).trim();
+      user.tableNumber = table;
+      user.roomNumber = room;
     }
     await user.save();
+    io.emit('staff_update');
+    io.emit('board_update');
     const newToken = jwt.sign({ id: user._id, role: user.role, roles: user.roles, username: user.username }, JWT_SECRET, { expiresIn: '12h' });
     res.json({ success: true, role: user.role, tableNumber: user.tableNumber, roomNumber: user.roomNumber, token: newToken });
   } catch (err) {
