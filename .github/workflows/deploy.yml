@@ -110,29 +110,10 @@ jobs:
       - name: Copy stack files
         env:
           TARGET: ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}
-        run: scp deploy/compose.yml deploy/backup.sh deploy/uninstall.sh "$TARGET:/opt/interview/"
+        run: scp deploy/compose.yml deploy/backup.sh deploy/uninstall.sh deploy/remote-deploy.sh "$TARGET:/opt/interview/"
 
       - name: Deploy
         env:
           TARGET: ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}
           TAG: ${{ github.sha }}
-        run: |
-          ssh "$TARGET" "IMAGE='$IMAGE' TAG='$TAG' bash -s" <<'EOF'
-          set -euo pipefail
-          cd /opt/interview
-          test -f .env || { echo "/opt/interview/.env missing - see docs/deploy-oracle.md"; exit 1; }
-          prev=$(sed -n 's/^IMAGE_TAG=//p' .env)
-          setvar() { if grep -q "^$1=" .env; then sed -i "s|^$1=.*|$1=$2|" .env; else echo "$1=$2" >> .env; fi; }
-          setvar IMAGE "$IMAGE"
-          setvar IMAGE_TAG "$TAG"
-          [ -n "$prev" ] && [ "$prev" != "$TAG" ] && echo "$prev" > .prev_tag
-          docker compose pull app
-          docker compose up -d --wait --wait-timeout 120
-          docker compose ps
-          # Remove old images of THIS repository only (never a host-wide prune: other projects live here)
-          keep="$TAG fofl $(cat .prev_tag 2>/dev/null || true)"
-          docker image ls "$IMAGE" --format '{{.Tag}}' | while read -r t; do
-            case " $keep " in *" $t "*) ;; *) [ "$t" = "<none>" ] || docker image rm "$IMAGE:$t" || true ;; esac
-          done
-          docker image ls "$IMAGE" --filter dangling=true -q | xargs -r docker image rm || true
-          EOF
+        run: ssh "$TARGET" "cd /opt/interview && IMAGE='$IMAGE' TAG='$TAG' bash remote-deploy.sh"
