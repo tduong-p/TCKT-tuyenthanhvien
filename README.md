@@ -48,6 +48,8 @@ Server kiểm tra config khi khởi động. Nếu config sai (thiếu ban, trù
 
 ## Import dữ liệu
 
+Cách thường dùng là trang Admin: nút **Nhập Excel** / **Xuất Excel** ở tab nhân sự và tab ứng viên, có bước xem trước trước khi ghi (xem [huong_dan_su_dung.md](huong_dan_su_dung.md)). Các script dưới đây vẫn dùng được, tiện cho lần khởi tạo.
+
 Chạy trong thư mục `backend/`, với `MONGODB_URI` trỏ tới database của đơn vị (đặt trong `backend/.env`). Trên VM, chạy script bên trong container theo [docs/deploy-oracle.md § Import dữ liệu](docs/deploy-oracle.md#5-import-dữ-liệu).
 
 **Nhân sự.** File Excel cần các cột sau:
@@ -68,7 +70,8 @@ npm run import:candidates -- don_ban_a.xlsx --department BAN_A --code-column "MS
 
 - `--code-column`: tên cột chứa mã ứng viên. Mặc định là `candidate.codeLabel`.
 - `--sheet <tên>`: chọn sheet. Mặc định là sheet đầu tiên.
-- `--replace`: xoá ứng viên cũ của ban trước khi import. Nếu không có tuỳ chọn này, script cập nhật đơn của ứng viên đã tồn tại và giữ nguyên trạng thái phỏng vấn của họ.
+- `--replace`: xoá các ứng viên của ban không có trong file. Bị từ chối khi ban đã có ứng viên check-in hoặc đã được chấm. Nếu không có tuỳ chọn này, script cập nhật đơn của ứng viên đã tồn tại và giữ nguyên trạng thái phỏng vấn của họ.
+- Các cột bắt đầu bằng `[HT] ` (do nút Xuất Excel thêm vào) được bỏ qua.
 
 ## Chạy local
 

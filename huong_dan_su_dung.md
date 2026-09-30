@@ -10,18 +10,23 @@ Admin có toàn quyền quản lý hệ thống, từ nhân sự, danh sách ứ
 *Truy cập bằng tài khoản có quyền admin. Giao diện tại: `/admin`*
 
 ### 1.1. Quản lý Nhân sự (Người phỏng vấn / Lễ tân)
-- **Thêm nhân sự:** Điền `Tài khoản (để login)` (thường là mã sinh viên của nhân sự), `Họ và Tên` và chọn `Ban` tương ứng. Sau đó nhấn **Thêm**.
+- **Thêm nhân sự:** Điền `Tài khoản (để login)` (thường là mã sinh viên của nhân sự), `Họ và Tên`, chọn `Ban` và đánh dấu các vai trò (Phỏng vấn / Lễ tân / Admin). Sau đó nhấn **Thêm**.
+- **Nhập nhân sự từ Excel:** Ở tab nhân sự, bấm **Nhập Excel** và chọn file có các cột `username`, `fullName`, `department`, `roles` (vd: `admin,interviewer`; để trống thì là người phỏng vấn). Bấm **Xem trước** để xem số người mới, cập nhật, không đổi và các dòng bị bỏ qua kèm lý do; chưa có gì được ghi cho tới khi bấm **Xác nhận**. Đổi file hay tuỳ chọn thì phải xem trước lại.
+  - Ô **Xoá người không có trong file** xoá các tài khoản vắng mặt trong file (trừ chính bạn). Hệ thống từ chối nếu một trong số đó đang phỏng vấn. Bạn cũng không thể tự bỏ quyền admin của mình qua file.
+- **Xuất nhân sự:** Bấm **Xuất Excel** ở tab nhân sự để tải danh sách đúng định dạng trên. Sửa file đó rồi nhập lại là cách nhanh để cập nhật hàng loạt.
 - **Cấp / Thu hồi quyền:** Trong danh sách nhân sự, bạn có thể click vào các nút trạng thái (Quản trị, Lễ tân, Phỏng vấn) bên cạnh tên mỗi người để bật/tắt quyền tương ứng. Nút hiện màu xanh là đã cấp quyền, màu xám là chưa có.
 - **Xóa nhân sự:** Nhấn biểu tượng thùng rác màu đỏ để xóa tài khoản nhân sự (hành động này cần xác nhận).
 
 ### 1.2. Quản lý Ứng viên
-- **Upload danh sách (Excel):** Sử dụng nút **Tải file lên** để import danh sách ứng viên hàng loạt từ file Excel. Bạn có thể chọn tải lên cho Ban TCKT hoặc Ban Cán sự.
+- **Nhập ứng viên từ Excel:** Ở tab ứng viên, bấm **Nhập Excel**, chọn file (export từ Google Forms / Microsoft Forms), chọn sheet, **Ban** và **Cột mã ứng viên** (mặc định là cột MSSV). Bấm **Xem trước** để xem số ứng viên mới, cập nhật, không đổi và các dòng bị bỏ qua (vd: thiếu MSSV), rồi bấm **Xác nhận**. Ứng viên đã có chỉ được cập nhật đơn; trạng thái phỏng vấn giữ nguyên.
+  - Ô **Xoá ứng viên của ban này không có trong file** thay toàn bộ danh sách của ban. Hệ thống từ chối nếu ban đó đã có ứng viên check-in hoặc đã được chấm.
+- **Xuất ứng viên:** Bấm **Xuất Excel** ở tab ứng viên để tải danh sách của ban đang xem: toàn bộ cột đơn đăng ký, cộng các cột bắt đầu bằng `[HT]` (trạng thái, giờ check-in, phòng, bàn, người phỏng vấn, điểm, kết quả). Khi nhập lại file này, các cột `[HT]` được bỏ qua.
 - **Thêm ứng viên thủ công:** Điền mã ứng viên (MSSV) và họ tên rồi ấn **Thêm**.
 - **Xóa toàn bộ dữ liệu:** Nhấn nút **Xóa/Làm sạch** để reset toàn bộ hệ thống (xóa hết kết quả đánh giá, reset trạng thái ứng viên về ban đầu). Yêu cầu nhập mật khẩu bảo mật (Password làm sạch).
 
 ### 1.3. Theo dõi Bảng điều khiển (Dashboard)
 - Admin có thể theo dõi tiến độ tổng quan: số lượng người đang chờ, đang phỏng vấn, đã xong, theo từng ban.
-- Có thể dùng chức năng **Đóng vai** (Sang Lễ tân / Sang Người PV) trên thanh công cụ để trải nghiệm tính năng của các vai trò khác mà không cần đăng nhập lại.
+- **Đổi vai trò:** Người được cấp từ 2 vai trò trở lên sẽ được hỏi *"Bạn muốn vào với vai trò nào?"* ngay sau khi đăng nhập. Sau đó có thể đổi bất cứ lúc nào bằng menu **Đổi vai trò** trên thanh công cụ (có ở cả trang Admin, Lễ tân và Người phỏng vấn). Chọn Người phỏng vấn thì phải nhập số phòng và số bàn. Rời vai trò Người phỏng vấn sẽ giải phóng bàn; hệ thống không cho đổi khi đang có ứng viên ở bàn — hãy hoàn tất phỏng vấn trước.
 
 ### 1.4. Xem Báo cáo & Đánh giá
 - **Xuất Excel:** Bấm nút **Xuất Excel** để tải báo cáo kết quả phỏng vấn chi tiết (điểm từng tiêu chí, nhận xét, quyết định) về máy tính.

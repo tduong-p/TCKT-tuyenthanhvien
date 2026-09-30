@@ -165,6 +165,8 @@ Lưu ý rằng CI chép đè `compose.yml` mỗi lần deploy. Vì vậy muốn 
 
 ## 5. Import dữ liệu
 
+Thường chỉ cần dùng nút **Nhập Excel** trên trang Admin, không phải vào VM. Cách dưới đây dùng cho lần khởi tạo, khi chưa có tài khoản admin nào.
+
 Chép file Excel lên VM, vào `/opt/interview/import/`, rồi chạy script bên trong image. Script tự dùng `MONGODB_URI` của stack.
 
 ```bash
