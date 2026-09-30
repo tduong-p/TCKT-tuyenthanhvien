@@ -2,17 +2,16 @@
 
 Hệ thống điều phối phỏng vấn gồm các màn hình: check-in ứng viên, lễ tân, người phỏng vấn, màn hình TV phòng chờ và trang quản trị.
 
-Mỗi đơn vị chạy **một bản triển khai riêng** (một app Railway và một database MongoDB). Mọi thông tin riêng của đơn vị nằm trong `config/`, gồm tên, các ban, logo, tiêu chí chấm điểm và nhãn MSSV. Đơn vị không cần sửa code.
+Mỗi đơn vị chạy **một bản triển khai riêng**, gồm một container app và một database MongoDB. Mọi thông tin riêng của đơn vị nằm trong `config/`, gồm tên, các ban, logo, tiêu chí chấm điểm và nhãn MSSV. Đơn vị không cần sửa code.
 
 ## Triển khai cho một đơn vị mới
 
 1. **Fork hoặc copy repo** này.
 2. **Sửa `config/org.config.json`.** Bắt đầu từ file [`config/org.config.example.json`](config/org.config.example.json), rồi đặt ảnh vào `config/assets/`. Trong config, ảnh được tham chiếu bằng đường dẫn `/org-assets/<tên-file>`.
-3. **Commit** thư mục `config/`. Railway build từ git nên config phải nằm trong repo.
-4. **Tạo database MongoDB** riêng, ví dụ trên MongoDB Atlas.
-5. **Tạo project Railway** trỏ tới repo. `railway.toml` đã có sẵn. Build command là `npm run build`.
-6. **Đặt biến môi trường** trên Railway (xem bảng bên dưới).
-7. **Import nhân sự và ứng viên** (xem mục *Import dữ liệu*).
+3. **Commit** thư mục `config/`. Config được đóng gói vào Docker image lúc build.
+4. **Triển khai lên VM** bằng Docker Compose (app + MongoDB) và GitHub Actions: xem [docs/deploy-oracle.md](docs/deploy-oracle.md). Tài liệu này hướng dẫn setup VM, đặt secret, deploy, rollback, backup và gỡ bỏ.
+5. **Đặt biến môi trường** trong `/opt/interview/.env` trên VM (xem bảng bên dưới). Với stack Docker, `MONGODB_URI` do `compose.yml` tự ghép.
+6. **Import nhân sự và ứng viên** (xem mục *Import dữ liệu*).
 
 ### Biến môi trường
 
@@ -49,7 +48,7 @@ Server kiểm tra config khi khởi động. Nếu config sai (thiếu ban, trù
 
 ## Import dữ liệu
 
-Chạy trong thư mục `backend/`, với `MONGODB_URI` trỏ tới database của đơn vị. Để chạy trên database của Railway, đặt biến này trong `.env` hoặc dùng `railway run`.
+Chạy trong thư mục `backend/`, với `MONGODB_URI` trỏ tới database của đơn vị (đặt trong `backend/.env`). Trên VM, chạy script bên trong container theo [docs/deploy-oracle.md § Import dữ liệu](docs/deploy-oracle.md#5-import-dữ-liệu).
 
 **Nhân sự.** File Excel cần các cột sau:
 - `username`: bắt buộc
@@ -79,3 +78,17 @@ cd backend && npm start
 ```
 
 Sau đó mở http://localhost:5000. Khi `NODE_ENV` không phải `production`, mật khẩu nhân sự mặc định là `Abc@123`.
+
+## Chạy bằng Docker (local)
+
+```bash
+docker build -t interview .
+docker network create interview-local
+docker run -d --name interview-mongo --network interview-local mongo:8
+docker run --rm -p 5000:5000 --network interview-local \
+  -e MONGODB_URI=mongodb://interview-mongo:27017/interview \
+  -e JWT_SECRET=dev-secret -e STAFF_PASSWORD=dev-pass \
+  interview
+```
+
+Mở http://localhost:5000, rồi kiểm tra bằng `curl http://localhost:5000/api/public/health`. Kết quả mong đợi là `{"ok":true}`. Dọn dẹp: `docker rm -f interview-mongo && docker network rm interview-local`.
