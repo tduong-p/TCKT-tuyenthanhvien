@@ -2,7 +2,8 @@
 import * as XLSX from 'xlsx';
 
 export async function readWorkbook(file) {
-  const wb = XLSX.read(await file.arrayBuffer(), { cellDates: true });
+  // No cellDates: dates then depend on the browser timezone and would differ from the CLI (VM in UTC)
+  const wb = XLSX.read(await file.arrayBuffer());
   return {
     sheetNames: wb.SheetNames,
     rowsOf: name => XLSX.utils.sheet_to_json(wb.Sheets[name], { defval: '' }),
