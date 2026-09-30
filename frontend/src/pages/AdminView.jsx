@@ -3,7 +3,8 @@ import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, LayoutDashboard, Users, AlertTriangle, Download, Clock, ShieldCheck, FileText, RefreshCw, Hash, Trash2, List, Upload } from 'lucide-react';
+import RoleSwitcher from '../components/RoleSwitcher';
+import { LogOut, LayoutDashboard, Users, AlertTriangle, Download, Clock, ShieldCheck, FileText, Trash2, List, Upload } from 'lucide-react';
 import { createSocket } from '../socket';
 import Board from './Board';
 import ChatWidget from '../components/ChatWidget';
@@ -21,48 +22,6 @@ export default function AdminView() {
     navigate('/');
   };
 
-  const performSwitchToRole = async (roleName, path) => {
-    let tableNum = null;
-    let roomNum = null;
-    
-    if (roleName === 'interviewer') {
-      const stored = JSON.parse(localStorage.getItem('user')) || {};
-      const lastRoom = localStorage.getItem('lastRoomNumber') || stored.roomNumber || "";
-      const lastTable = localStorage.getItem('lastTableNumber') || stored.tableNumber || "";
-      
-      roomNum = window.prompt("Vui lòng nhập số Phòng (ví dụ: 101, hoặc để trống):", lastRoom);
-      if (roomNum === null) return; // User cancelled
-      
-      tableNum = window.prompt("Vui lòng nhập số Bàn phỏng vấn (bắt buộc):", lastTable);
-      if (!tableNum) return; // User cancelled or left empty
-    }
-
-    const userObj = JSON.parse(localStorage.getItem('user')) || {};
-
-    const res = await fetch('/api/staff/switch-role', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        username: userObj.username, 
-        targetRole: roleName,
-        tableNumber: tableNum,
-        roomNumber: roomNum
-      })
-    });
-    const data = await res.json();
-    if (data.success) {
-      const stored = JSON.parse(localStorage.getItem('user'));
-      stored.role = roleName;
-      if (tableNum) stored.tableNumber = tableNum;
-      if (roomNum !== null) stored.roomNumber = roomNum;
-      localStorage.setItem('user', JSON.stringify(stored));
-      if (tableNum) localStorage.setItem('lastTableNumber', tableNum);
-      if (roomNum) localStorage.setItem('lastRoomNumber', roomNum);
-      window.location.href = path;
-    } else {
-      toast.error("Lỗi chuyển đổi quyền: " + data.message);
-    }
-  };
 
   const socketRef = useRef(null);
   const [boardData, setBoardData] = useState({ waiting: [], moving: [], interviewing: [], completed: [] });
@@ -74,9 +33,6 @@ export default function AdminView() {
   const [draftDepartments, setDraftDepartments] = useState({});
   const [newUser, setNewUser] = useState({ username: '', fullName: '', department: defaultDepartment, roles: ['interviewer'] });
   const [newCandidate, setNewCandidate] = useState({ interviewCode: '', fullName: '', department: defaultDepartment });
-  const [showTablePrompt, setShowTablePrompt] = useState(false);
-  const [tableNumber, setTableNumber] = useState('');
-  const [roomNumber, setRoomNumber] = useState('');
   const user = JSON.parse(localStorage.getItem('user')) || {};
   const isSuperAdmin = user.role === 'admin' || (user.roles && user.roles.includes('admin'));
   const [viewDepartment, setViewDepartment] = useState(user.department || defaultDepartment);
@@ -101,41 +57,8 @@ export default function AdminView() {
     if (activeTab === 'candidates' && isSuperAdmin) fetchCandidates();
   }, [activeTab]);
 
-  const performSwitchRole = async (rNum, tNum) => {
-    if (!tNum || !rNum) return toast.error('Vui lòng nhập số phòng và số bàn');
-    
-    const res = await fetch('/api/staff/switch-role', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: user.username, targetRole: 'interviewer', roomNumber: rNum, tableNumber: tNum })
-    });
-    const data = await res.json();
-    if (data.success) {
-      const stored = JSON.parse(localStorage.getItem('user'));
-      stored.role = 'interviewer';
-      stored.roomNumber = rNum;
-      stored.tableNumber = tNum;
-      if (data.token) stored.token = data.token;
-      localStorage.setItem('user', JSON.stringify(stored));
-      navigate('/interviewer');
-    }
-  };
 
-  const switchRole = (e) => {
-    e.preventDefault();
-    performSwitchRole(roomNumber, tableNumber);
-  };
 
-  const handleSwitchToInterviewer = () => {
-    const stored = JSON.parse(localStorage.getItem('user')) || {};
-    if (stored.tableNumber && stored.roomNumber) {
-      performSwitchRole(stored.roomNumber, stored.tableNumber);
-    } else {
-      setRoomNumber(localStorage.getItem('lastRoomNumber') || '');
-      setTableNumber(localStorage.getItem('lastTableNumber') || '');
-      setShowTablePrompt(true);
-    }
-  };
 
   const fetchBoard = async () => {
     const query = viewDepartment ? `?department=${viewDepartment}` : '';
@@ -566,16 +489,7 @@ export default function AdminView() {
                 <Trash2 size={16} /> Làm sạch dữ liệu
               </button>
             )}
-            {user.roles && user.roles.includes('interviewer') && (
-              <button onClick={handleSwitchToInterviewer} className="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-all flex items-center gap-2">
-                <RefreshCw size={16} /> Sang Người PV
-              </button>
-            )}
-            {user.roles && user.roles.includes('receptionist') && (
-              <button onClick={() => performSwitchToRole('receptionist', '/receptionist')} className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-all flex items-center gap-2 text-white">
-                <RefreshCw size={16} /> Sang Lễ Tân
-              </button>
-            )}
+            <RoleSwitcher />
             
             {activeTab === 'evaluations' && (
               <button onClick={exportToExcel} className="bg-green-600 hover:bg-green-500 px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-all flex items-center gap-2">
@@ -857,50 +771,6 @@ export default function AdminView() {
         codeLabel={codeLabel}
       />
 
-      {/* Role Switch Modal */}
-      {showTablePrompt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <form onSubmit={switchRole} className="bg-white/90 backdrop-blur-xl rounded-[2rem] w-full max-w-sm shadow-2xl overflow-hidden flex flex-col p-8 border border-white/50 animate-fade-in-up">
-            <h3 className="text-xl font-black text-slate-800 tracking-tight mb-4 text-center">Chuyển sang Người Phỏng Vấn</h3>
-            
-            <div className="space-y-4 mb-8">
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-500 transition-colors">
-                  <Hash size={20} />
-                </div>
-                <input 
-                  type="text" 
-                  required
-                  autoFocus
-                  placeholder="Số phòng (VD: 1, 2...)"
-                  value={roomNumber}
-                  onChange={(e) => setRoomNumber(e.target.value)}
-                  className="w-full pl-11 border-2 border-slate-200 rounded-2xl px-4 py-3.5 bg-white/50 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white transition-all font-medium text-slate-800"
-                />
-              </div>
-
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-500 transition-colors">
-                  <Hash size={20} />
-                </div>
-                <input 
-                  type="text" 
-                  required
-                  placeholder="Số bàn (VD: 1, 2...)"
-                  value={tableNumber}
-                  onChange={(e) => setTableNumber(e.target.value)}
-                  className="w-full pl-11 border-2 border-slate-200 rounded-2xl px-4 py-3.5 bg-white/50 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white transition-all font-medium text-slate-800"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button type="button" onClick={() => setShowTablePrompt(false)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3.5 rounded-xl transition-colors">Hủy</button>
-              <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-md transition-all">Xác nhận</button>
-            </div>
-          </form>
-        </div>
-      )}
     </div>
   );
 }

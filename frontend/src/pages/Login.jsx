@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { UserCircle, LogIn, ArrowRight, UserCheck, LayoutDashboard, Hash, Monitor, User, CheckCircle2 } from 'lucide-react';
 import MacBackground from '../components/MacBackground';
+import { switchRole, ROLE_LABELS } from '../lib/switchRole';
 import { useOrgConfig } from '../orgConfig';
 
 // Fixed positions for the floating decoration images listed in org config `branding.decorations`
@@ -29,6 +30,7 @@ export default function Login() {
   const [roomNumber, setRoomNumber] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('');
   const [tempUser, setTempUser] = useState(null);
+  const [pickedRole, setPickedRole] = useState('');
   const navigate = useNavigate();
   const { config, departments, codeLabel, deptName, deptShortName, getCandidateName } = useOrgConfig();
   const decorations = (config.branding.decorations || []).slice(0, DECORATION_SLOTS.length);
@@ -42,6 +44,41 @@ export default function Login() {
     }
   }, [navigate]);
   
+  // Staff login in the role the server returned
+  const finishStaffLogin = (data) => {
+    if (data.role === 'interviewer') {
+      if (data.tableNumber && data.roomNumber) {
+        localStorage.setItem('user', JSON.stringify({ 
+          username: data.username, 
+          fullName: data.fullName,
+          role: data.role, 
+          department: data.department,
+          tableNumber: data.tableNumber,
+          roomNumber: data.roomNumber,
+          autoAssign: data.autoAssign,
+          roles: data.roles,
+          token: data.token 
+        }));
+        navigate('/interviewer');
+      } else {
+        setTempUser(data);
+        setStep(2); // Ask for Table & Room Number
+      }
+    } else if (data.role === 'receptionist' || (data.roles && data.roles.includes('receptionist') && !data.roles.includes('admin'))) {
+      localStorage.setItem('user', JSON.stringify({ username: data.username, fullName: data.fullName, role: 'receptionist', department: data.department, roles: data.roles, token: data.token }));
+      navigate('/receptionist');
+    } else {
+      // Admin
+      localStorage.setItem('user', JSON.stringify({ username: data.username, fullName: data.fullName, role: 'admin', department: data.department, roles: data.roles, token: data.token }));
+      navigate('/admin');
+    }
+  };
+
+  // Keep the just-received token (switch-role needs it), in the role the server logged us in as
+  const storeStaff = (data) => {
+    localStorage.setItem('user', JSON.stringify({ username: data.username, fullName: data.fullName, role: data.role, department: data.department, roles: data.roles, tableNumber: data.tableNumber, roomNumber: data.roomNumber, autoAssign: data.autoAssign, token: data.token }));
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     
@@ -66,31 +103,12 @@ export default function Login() {
         } else if (data.role === 'candidate') {
           setTempUser(data);
           setStep(1.75); // Confirmation screen
-        } else if (data.role === 'interviewer') {
-          if (data.tableNumber && data.roomNumber) {
-            localStorage.setItem('user', JSON.stringify({ 
-              username: data.username, 
-              fullName: data.fullName,
-              role: data.role, 
-              department: data.department,
-              tableNumber: data.tableNumber,
-              roomNumber: data.roomNumber,
-              autoAssign: data.autoAssign,
-              roles: data.roles,
-              token: data.token 
-            }));
-            navigate('/interviewer');
-          } else {
-            setTempUser(data);
-            setStep(2); // Ask for Table & Room Number
-          }
-        } else if (data.role === 'receptionist' || (data.roles && data.roles.includes('receptionist') && !data.roles.includes('admin'))) {
-          localStorage.setItem('user', JSON.stringify({ username: data.username, fullName: data.fullName, role: 'receptionist', department: data.department, roles: data.roles, token: data.token }));
-          navigate('/receptionist');
+        } else if (data.roles?.length >= 2) {
+          setTempUser(data);
+          setPickedRole(data.role);
+          setStep(1.9); // Pick which role to enter with
         } else {
-          // Admin
-          localStorage.setItem('user', JSON.stringify({ username: data.username, fullName: data.fullName, role: 'admin', department: data.department, roles: data.roles, token: data.token }));
-          navigate('/admin');
+          finishStaffLogin(data);
         }
       } else {
         toast.error(data.message || "Không tìm thấy Mã số này. Vui lòng kiểm tra lại!");
@@ -117,10 +135,32 @@ export default function Login() {
       localStorage.setItem('user', JSON.stringify({ interviewCode: tempUser.interviewCode, role: 'candidate', department: tempUser.department, token: tempUser.token }));
       navigate('/candidate');
     }
+    // Step 1.9: Staff with several roles picks one
+    else if (step === 1.9) {
+      if (pickedRole === tempUser.role) return finishStaffLogin(tempUser);
+      if (pickedRole === 'interviewer') {
+        setRoomNumber(localStorage.getItem('lastRoomNumber') || '');
+        setTableNumber(localStorage.getItem('lastTableNumber') || '');
+        setStep(2);
+        return;
+      }
+      storeStaff(tempUser);
+      const r = await switchRole(pickedRole);
+      if (r.ok) navigate(r.path);
+      else toast.error('Không đổi được vai trò: ' + r.message);
+    }
     // Step 2: Set Table & Room Number for Interviewer
     else if (step === 2) {
       if (!tableNumber.trim() || !roomNumber.trim()) {
         toast.error("Vui lòng nhập cả số phòng và số bàn!");
+        return;
+      }
+      // Logged in as another role and picked interviewer at step 1.9
+      if (tempUser && tempUser.role !== 'interviewer') {
+        storeStaff(tempUser);
+        const r = await switchRole('interviewer', { roomNumber: roomNumber.trim(), tableNumber: tableNumber.trim() });
+        if (r.ok) navigate(r.path);
+        else toast.error('Không đổi được vai trò: ' + r.message);
         return;
       }
       const res = await fetch('/api/login', {
@@ -261,6 +301,29 @@ export default function Login() {
             </div>
           )}
 
+          {step === 1.9 && tempUser && (
+            <div className="space-y-4 animate-fade-in">
+              <label className="block text-sm font-bold text-slate-700 ml-1">
+                Xin chào {tempUser.fullName || tempUser.username}, bạn muốn vào với vai trò nào?
+              </label>
+              <div className="space-y-2">
+                {tempUser.roles.filter(r => ROLE_LABELS[r]).map(r => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setPickedRole(r)}
+                    className={`w-full text-left px-4 py-3.5 rounded-2xl border-2 font-bold transition-all ${pickedRole === r ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white/50 text-slate-700 hover:border-blue-300'}`}
+                  >
+                    {ROLE_LABELS[r]}
+                  </button>
+                ))}
+              </div>
+              <button type="button" onClick={() => setStep(1)} className="text-sm font-semibold text-blue-500 hover:text-blue-700 mt-2 block ml-1">
+                &larr; Quay lại
+              </button>
+            </div>
+          )}
+
           {step === 2 && (
             <div className="space-y-4 animate-fade-in">
               <div className="space-y-1">
@@ -325,7 +388,7 @@ export default function Login() {
           
           {step !== 1.75 && step !== 1.8 && (
             <button type="submit" className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 mt-8 rounded-2xl font-black text-lg shadow-lg hover:shadow-indigo-500/30 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all">
-              <LogIn size={20} /> {step === 1 ? 'TIẾP TỤC' : step === 1.2 ? 'ĐĂNG NHẬP' : step === 1.5 ? 'XÁC NHẬN VÀO PHÒNG CHỜ' : 'XÁC NHẬN VÀO BÀN'}
+              <LogIn size={20} /> {step === 1 ? 'TIẾP TỤC' : step === 1.2 ? 'ĐĂNG NHẬP' : step === 1.5 ? 'XÁC NHẬN VÀO PHÒNG CHỜ' : step === 1.9 ? 'VÀO' : 'XÁC NHẬN VÀO BÀN'}
             </button>
           )}
         </form>

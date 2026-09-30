@@ -2,6 +2,7 @@ import Swal from 'sweetalert2';
 import React, { useEffect, useState, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+import RoleSwitcher from '../components/RoleSwitcher';
 import { createSocket } from '../socket';
 import { Coffee, User, CheckCircle, Save, MessageSquare, UserCheck, Loader2, RefreshCw, Hand, X, XCircle, LogOut } from 'lucide-react';
 import ChatWidget from '../components/ChatWidget';
@@ -17,48 +18,6 @@ export default function InterviewerView() {
   };
 
 
-    const performSwitchToRole = async (roleName, path) => {
-    let tableNum = null;
-    let roomNum = null;
-    
-    if (roleName === 'interviewer') {
-      const stored = JSON.parse(localStorage.getItem('user')) || {};
-      const lastRoom = localStorage.getItem('lastRoomNumber') || stored.roomNumber || "";
-      const lastTable = localStorage.getItem('lastTableNumber') || stored.tableNumber || "";
-      
-      roomNum = window.prompt("Vui lòng nhập số Phòng (ví dụ: 101, hoặc để trống):", lastRoom);
-      if (roomNum === null) return; // User cancelled
-      
-      tableNum = window.prompt("Vui lòng nhập số Bàn phỏng vấn (bắt buộc):", lastTable);
-      if (!tableNum) return; // User cancelled or left empty
-    }
-
-    const userObj = JSON.parse(localStorage.getItem('user')) || {};
-
-    const res = await fetch('/api/staff/switch-role', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        username: userObj.username, 
-        targetRole: roleName,
-        tableNumber: tableNum,
-        roomNumber: roomNum
-      })
-    });
-    const data = await res.json();
-    if (data.success) {
-      const stored = JSON.parse(localStorage.getItem('user'));
-      stored.role = roleName;
-      if (tableNum) stored.tableNumber = tableNum;
-      if (roomNum !== null) stored.roomNumber = roomNum;
-      localStorage.setItem('user', JSON.stringify(stored));
-      if (tableNum) localStorage.setItem('lastTableNumber', tableNum);
-      if (roomNum) localStorage.setItem('lastRoomNumber', roomNum);
-      window.location.href = path;
-    } else {
-      toast.error("Lỗi chuyển đổi quyền: " + data.message);
-    }
-  };
   const [user, setUser] = useState(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [currentCandidate, setCurrentCandidate] = useState(null);
@@ -299,17 +258,7 @@ export default function InterviewerView() {
                 </div>
               </div>
               
-              {/* Role Switcher for specific admins */}
-              {user.roles && user.roles.includes('admin') && (
-        <button onClick={() => performSwitchToRole('admin', '/admin')} className="ml-4 bg-amber-500 hover:bg-amber-600 px-4 py-2 rounded-xl text-sm font-bold border border-amber-400 transition-all flex items-center gap-2 text-white shadow-sm">
-          <RefreshCw size={16} /> Admin
-        </button>
-      )}
-      {user.roles && user.roles.includes('receptionist') && (
-        <button onClick={() => performSwitchToRole('receptionist', '/receptionist')} className="ml-4 bg-purple-500 hover:bg-purple-600 px-4 py-2 rounded-xl text-sm font-bold border border-purple-400 transition-all flex items-center gap-2 text-white shadow-sm">
-          <RefreshCw size={16} /> Lễ Tân
-        </button>
-      )}
+              <div className="ml-4"><RoleSwitcher /></div>
             </div>
 
             <div className="flex items-center gap-3 w-full md:w-auto justify-end">

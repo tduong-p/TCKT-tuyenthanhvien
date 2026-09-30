@@ -2,7 +2,8 @@ import Swal from 'sweetalert2';
 import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
-import { Users, Monitor, List, CheckCircle, RefreshCw, LogOut } from 'lucide-react';
+import RoleSwitcher from '../components/RoleSwitcher';
+import { Users, Monitor, List, CheckCircle, LogOut } from 'lucide-react';
 import { createSocket } from '../socket';
 import Board from './Board';
 import ChatWidget from '../components/ChatWidget';
@@ -19,48 +20,6 @@ export default function ReceptionistView() {
   };
 
 
-    const performSwitchToRole = async (roleName, path) => {
-    let tableNum = null;
-    let roomNum = null;
-    
-    if (roleName === 'interviewer') {
-      const stored = JSON.parse(localStorage.getItem('user')) || {};
-      const lastRoom = localStorage.getItem('lastRoomNumber') || stored.roomNumber || "";
-      const lastTable = localStorage.getItem('lastTableNumber') || stored.tableNumber || "";
-      
-      roomNum = window.prompt("Vui lòng nhập số Phòng (ví dụ: 101, hoặc để trống):", lastRoom);
-      if (roomNum === null) return; // User cancelled
-      
-      tableNum = window.prompt("Vui lòng nhập số Bàn phỏng vấn (bắt buộc):", lastTable);
-      if (!tableNum) return; // User cancelled or left empty
-    }
-
-    const userObj = JSON.parse(localStorage.getItem('user')) || {};
-
-    const res = await fetch('/api/staff/switch-role', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        username: userObj.username, 
-        targetRole: roleName,
-        tableNumber: tableNum,
-        roomNumber: roomNum
-      })
-    });
-    const data = await res.json();
-    if (data.success) {
-      const stored = JSON.parse(localStorage.getItem('user'));
-      stored.role = roleName;
-      if (tableNum) stored.tableNumber = tableNum;
-      if (roomNum !== null) stored.roomNumber = roomNum;
-      localStorage.setItem('user', JSON.stringify(stored));
-      if (tableNum) localStorage.setItem('lastTableNumber', tableNum);
-      if (roomNum) localStorage.setItem('lastRoomNumber', roomNum);
-      window.location.href = path;
-    } else {
-      toast.error("Lỗi chuyển đổi quyền: " + data.message);
-    }
-  };
   const socketRef = useRef(null);
   const [boardData, setBoardData] = useState({ waiting: [], interviewing: [], completed: [] });
   const [candidates, setCandidates] = useState([]);
@@ -222,16 +181,7 @@ export default function ReceptionistView() {
             >
               <CheckCircle size={16} /> Check-in Hộ
             </button>
-            {user.roles && user.roles.includes('admin') && (
-              <button onClick={() => performSwitchToRole('admin', '/admin')} className="bg-amber-600 hover:bg-amber-500 px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-all flex items-center gap-2 text-white">
-                <RefreshCw size={16} /> Sang Admin
-              </button>
-            )}
-            {user.roles && user.roles.includes('interviewer') && (
-              <button onClick={() => performSwitchToRole('interviewer', '/interviewer')} className="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-all flex items-center gap-2 text-white">
-                <RefreshCw size={16} /> Sang Người PV
-              </button>
-            )}
+            <RoleSwitcher />
           </div>
         </div>
 
