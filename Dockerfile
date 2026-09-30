@@ -14,7 +14,6 @@ COPY backend/package.json backend/package-lock.json ./
 RUN npm ci --omit=dev
 
 FROM node:20-slim
-LABEL org.opencontainers.image.source=https://github.com/phamvietbach2006-max/k71-interview-system
 ENV NODE_ENV=production PORT=5000
 WORKDIR /app
 COPY --from=deps /app/backend/node_modules ./backend/node_modules

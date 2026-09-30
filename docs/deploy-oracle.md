@@ -20,7 +20,7 @@ Internet ──443──▶ nginx (host) ──▶ 127.0.0.1:5000 app ──▶ 
 - Docker Engine và Docker Compose v2.
 - nginx và certbot (gói `python3-certbot-nginx`) chạy trên host.
 - Một tên miền trỏ về IP public của VM, ví dụ `fofl-k71-phongvan.duckdns.org`.
-- Quyền admin trên repo GitHub. Chỉ admin mới tạo được environment, secret và đổi quyền hiển thị của package.
+- Quyền admin trên repo GitHub chạy CI. Chỉ admin mới tạo được environment, secret và đổi quyền hiển thị của package. Repo cá nhân không cho gán quyền admin cho collaborator, nên nếu bạn không phải chủ repo thì **fork** repo về tài khoản của mình và deploy từ fork. Image nằm ở `ghcr.io/<chủ repo chạy CI>/k71-interview-system`; CI tự ghi `IMAGE` và `IMAGE_TAG` vào `.env`.
 
 ## 2. Setup VM lần đầu
 
@@ -69,6 +69,7 @@ mkdir -p /opt/interview/data/mongo /opt/interview/backups
 cd /opt/interview
 umask 077
 cat > .env <<EOF
+IMAGE=ghcr.io/<owner>/k71-interview-system
 IMAGE_TAG=fofl
 MONGO_ROOT_USER=interview_root
 MONGO_ROOT_PASSWORD=$(openssl rand -hex 24)

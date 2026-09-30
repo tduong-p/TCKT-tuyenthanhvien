@@ -11,9 +11,6 @@ concurrency:
   group: deploy-${{ github.ref }}
   cancel-in-progress: false
 
-env:
-  IMAGE: ghcr.io/phamvietbach2006-max/k71-interview-system
-
 jobs:
   build:
     runs-on: ubuntu-24.04-arm
@@ -22,6 +19,10 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+
+      # Image lives under the repository running the workflow (GHCR names must be lowercase)
+      - name: Image name
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
 
       - uses: docker/setup-buildx-action@v3
 
@@ -32,6 +33,7 @@ jobs:
           platforms: linux/arm64
           load: true
           tags: ${{ env.IMAGE }}:${{ github.sha }}
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -79,6 +81,7 @@ jobs:
           tags: |
             ${{ env.IMAGE }}:${{ github.sha }}
             ${{ env.IMAGE }}:fofl
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           cache-from: type=gha
 
   deploy:
@@ -90,6 +93,9 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+
+      - name: Image name
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
 
       - name: Set up SSH
         env:
@@ -116,7 +122,9 @@ jobs:
           cd /opt/interview
           test -f .env || { echo "/opt/interview/.env missing - see docs/deploy-oracle.md"; exit 1; }
           prev=$(sed -n 's/^IMAGE_TAG=//p' .env)
-          if grep -q '^IMAGE_TAG=' .env; then sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$TAG/" .env; else echo "IMAGE_TAG=$TAG" >> .env; fi
+          setvar() { if grep -q "^$1=" .env; then sed -i "s|^$1=.*|$1=$2|" .env; else echo "$1=$2" >> .env; fi; }
+          setvar IMAGE "$IMAGE"
+          setvar IMAGE_TAG "$TAG"
           [ -n "$prev" ] && [ "$prev" != "$TAG" ] && echo "$prev" > .prev_tag
           docker compose pull app
           docker compose up -d --wait --wait-timeout 120

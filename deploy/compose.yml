@@ -22,7 +22,7 @@ services:
     # no ports: only reachable from the app container
 
   app:
-    image: ghcr.io/phamvietbach2006-max/k71-interview-system:${IMAGE_TAG:-fofl}
+    image: ${IMAGE:?set IMAGE in .env}:${IMAGE_TAG:-fofl}
     env_file: .env
     environment:
       MONGODB_URI: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/interview?authSource=admin
