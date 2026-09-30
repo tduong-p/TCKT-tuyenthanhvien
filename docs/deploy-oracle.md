@@ -98,10 +98,10 @@ Tham số `--cert-name interview` cho stack này một chứng chỉ riêng, kh�
 ### 2.6 Backup hằng ngày
 
 ```bash
-( crontab -l 2>/dev/null; echo '30 3 * * * /opt/interview/backup.sh >> /opt/interview/backups/backup.log 2>&1 # interview-backup' ) | crontab -
+( crontab -l 2>/dev/null; echo '15 3 * * * /opt/interview/backup.sh >> /opt/interview/backups/backup.log 2>&1 # interview-backup' ) | crontab -
 ```
 
-Job này chạy lúc 03:30 mỗi ngày và giữ lại 14 bản mới nhất. Dòng cron có tag `# interview-backup` để `uninstall.sh` tìm và xoá đúng dòng này.
+Job này chạy lúc 03:15 mỗi ngày và giữ lại 14 bản mới nhất. Dòng cron có tag `# interview-backup` để `uninstall.sh` tìm và xoá đúng dòng này.
 
 ## 3. Key CI và secret trên GitHub
 
