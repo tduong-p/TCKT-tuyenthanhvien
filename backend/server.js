@@ -366,6 +366,8 @@ app.post('/api/evaluation', requireStaff('interviewer'), async (req, res) => {
       }
       scoreList.push({ key: c.key, label: c.label, score });
     }
+    const candidate = await Candidate.findOne({ interviewCode, department });
+    if (!candidate) return res.status(404).json({ success: false, message: 'Không tìm thấy ứng viên' });
     const averageScore = Math.round(scoreList.reduce((a, s) => a + s.score, 0) / scoreList.length * 10) / 10;
     const evaluation = new Evaluation({
       interviewCode, department, interviewerUsername, scores: scoreList, averageScore, notes, result
