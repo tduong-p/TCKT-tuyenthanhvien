@@ -1,0 +1,38 @@
+# Interview system stack for one VM. Lives in /opt/interview next to .env (see deploy/.env.example).
+# CI copies this file on every deploy; do not edit it on the VM.
+name: interview
+
+services:
+  mongo:
+    image: mongo:8
+    command: ["--wiredTigerCacheSizeGB", "0.25"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:?set MONGO_ROOT_USER in .env}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?set MONGO_ROOT_PASSWORD in .env}
+    volumes:
+      - ./data/mongo:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"db.adminCommand('ping').ok\" | grep -q 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    mem_limit: 768m
+    restart: unless-stopped
+    # no ports: only reachable from the app container
+
+  app:
+    image: ghcr.io/phamvietbach2006-max/k71-interview-system:${IMAGE_TAG:-fofl}
+    env_file: .env
+    environment:
+      MONGODB_URI: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/interview?authSource=admin
+      # ORG_CONFIG: /app/config/org.config.json
+    # volumes:
+    #   - ./config:/app/config:ro
+    ports:
+      - "127.0.0.1:5000:5000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    mem_limit: 384m
+    restart: unless-stopped
