@@ -62,6 +62,9 @@ function load() {
   cfg.appTitle = cfg.appTitle || 'Hệ thống phỏng vấn';
   cfg.systemName = cfg.systemName || cfg.appTitle;
   cfg.waitWarningMinutes = cfg.waitWarningMinutes || 30;
+  // false: interviewers only call candidates by hand (no auto-dispatch loop, no toggle)
+  if (cfg.autoAssign === undefined) cfg.autoAssign = true;
+  if (typeof cfg.autoAssign !== 'boolean') fail('"autoAssign" must be true or false');
   return cfg;
 }
 

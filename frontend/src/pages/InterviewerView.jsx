@@ -35,12 +35,14 @@ export default function InterviewerView() {
   const [boardData, setBoardData] = useState({ waiting: [], interviewing: [], completed: [] });
   const [showQueueModal, setShowQueueModal] = useState(false);
   const [autoAssign, setAutoAssign] = useState(false);
+  // The org config can turn auto-dispatch off for the whole deployment: manual calling only, no toggle
+  const autoAllowed = config.autoAssign !== false;
 
   useEffect(() => {
     const stored = JSON.parse(localStorage.getItem('user'));
     if (stored && stored.role === 'interviewer') {
       setUser(stored);
-      setAutoAssign(stored.autoAssign === true);
+      setAutoAssign(autoAllowed && stored.autoAssign === true);
       fetchBoard();
     }
     setIsLoaded(true);
@@ -299,13 +301,13 @@ export default function InterviewerView() {
 
             <div className="flex items-center gap-3 w-full md:w-auto justify-end">
               {/* Auto Assign Toggle */}
-              <button 
+              {autoAllowed && <button 
                 onClick={toggleAutoAssign}
                 className={`flex items-center gap-2 px-4 py-3 rounded-xl font-bold transition-all shadow-md text-sm border-2 ${autoAssign ? 'bg-blue-600/50 border-blue-400 hover:bg-blue-600' : 'bg-slate-700/50 border-slate-500 hover:bg-slate-700 text-slate-200'}`}
               >
                 <RefreshCw size={18} className={autoAssign ? 'animate-spin-slow' : ''} />
                 {autoAssign ? 'Tự động gọi' : 'Chọn thủ công'}
-              </button>
+              </button>}
 
               <button 
                 onClick={handleToggleBreak}
@@ -329,9 +331,15 @@ export default function InterviewerView() {
             <div className="flex-1">
               {!currentCandidate && !isBreak && (
                 <div className="h-full flex flex-col items-center justify-center text-slate-400 mt-20">
-                  <Loader2 className="animate-spin mb-4" size={48} />
-                  <h2 className="text-2xl font-semibold text-slate-500">Đang đợi hệ thống phân công...</h2>
-                  <p className="mt-2 text-slate-400 mb-6">Hệ thống sẽ tự động gọi ứng viên tiếp theo vào bàn của bạn.</p>
+                  {autoAssign ? <>
+                    <Loader2 className="animate-spin mb-4" size={48} />
+                    <h2 className="text-2xl font-semibold text-slate-500">Đang đợi hệ thống phân công...</h2>
+                    <p className="mt-2 text-slate-400 mb-6">Hệ thống sẽ tự động gọi ứng viên tiếp theo vào bàn của bạn.</p>
+                  </> : <>
+                    <Hand className="mb-4" size={48} />
+                    <h2 className="text-2xl font-semibold text-slate-500">Bàn đang trống</h2>
+                    <p className="mt-2 text-slate-400 mb-6">Mở hàng chờ chung và bấm GỌI để mời ứng viên tiếp theo vào bàn.</p>
+                  </>}
                   
                   <button onClick={() => setShowQueueModal(true)} className="bg-white/50 backdrop-blur-sm border-2 border-blue-400 text-blue-600 px-6 py-3 rounded-xl font-bold hover:bg-blue-50 transition-colors shadow-sm">
                     Xem hàng chờ chung ({boardData.waiting.length})

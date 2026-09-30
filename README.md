@@ -43,6 +43,7 @@ Khi chạy local, copy `backend/.env.example` thành `backend/.env`. Không comm
 | `evaluation.criteria[]` | Tiêu chí chấm điểm. Mỗi tiêu chí có `key`, `label`, `shortLabel`, `min`, `max`, `default`. Điểm trung bình được tính trên các tiêu chí này. |
 | `evaluation.results[]` | Các kết quả có thể chọn. Mỗi kết quả có `value` và `tone` (`success`, `danger` hoặc `warning`). |
 | `waitWarningMinutes` | Số phút chờ; ứng viên chờ lâu hơn mức này sẽ được đánh dấu cảnh báo. |
+| `autoAssign` | `false`: tắt chế độ tự động gọi (hệ thống không tự đưa ứng viên vào bàn, ẩn nút chuyển chế độ; người phỏng vấn gọi thủ công từ hàng chờ). Mặc định `true`. |
 
 Server kiểm tra config khi khởi động. Nếu config sai (thiếu ban, trùng mã, JSON lỗi), server báo lỗi và dừng.
 

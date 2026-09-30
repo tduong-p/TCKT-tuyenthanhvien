@@ -159,7 +159,7 @@ const assignCandidates = async () => {
   }
 };
 
-setInterval(assignCandidates, 3000); // Check every 3 seconds
+if (orgConfig.autoAssign) setInterval(assignCandidates, 3000); // Check every 3 seconds
 
 // Other interviewers seated at the same table (a table may have several devices/accounts)
 const findTableMates = (user) => (user.tableNumber && user.roomNumber)
@@ -606,6 +606,9 @@ app.post('/api/messages/read', requireStaff(), async (req, res) => {
 
 app.post('/api/interviewer/settings', requireStaff('interviewer'), async (req, res) => {
   const { autoAssign } = req.body;
+  if (autoAssign && !orgConfig.autoAssign) {
+    return res.status(400).json({ success: false, message: 'Chế độ tự động gọi đã bị tắt' });
+  }
   try {
     const user = req.staff;
     user.autoAssign = !!autoAssign;

@@ -68,11 +68,11 @@ Nếu ứng viên không mang điện thoại hoặc không tự truy cập web 
   - Chỉ chấm được ứng viên đang ở đúng bàn của mình.
   - Một người **Rời bàn** hoặc đổi vai trò trong khi người kia vẫn ngồi thì ứng viên vẫn ở lại bàn; chỉ khi người cuối cùng rời bàn thì ứng viên mới được trả về hàng chờ.
 
-### 3.2. Gọi ứng viên (2 Chế độ)
-Nút chế độ nằm trên thanh tiêu đề; bấm vào để chuyển qua lại giữa hai chế độ. Khi mới vào bàn, chế độ mặc định là **Chọn thủ công**.
+### 3.2. Gọi ứng viên
+Người phỏng vấn tự gọi ứng viên, hệ thống không tự đưa ứng viên vào bàn. Khi bàn trống, màn hình hiện **Bàn đang trống**:
 
-- **Tự động gọi:** Nút hiện **Tự động gọi**. Cứ mỗi khi bàn của bạn trống, hệ thống tự động đưa ứng viên đang chờ lâu nhất vào bàn của bạn (chỉ vài giây sau khi bàn trống).
-- **Chọn thủ công:** Nút hiện **Chọn thủ công**. Bấm **Xem hàng chờ chung (N)** rồi bấm **GỌI** cạnh ứng viên muốn gọi.
+- Bấm **Xem hàng chờ chung (N)** để xem danh sách ứng viên đang chờ (xếp theo thứ tự check-in).
+- Bấm **GỌI** cạnh ứng viên muốn gọi. Nên gọi theo thứ tự từ trên xuống để ứng viên đến trước được phỏng vấn trước.
 
 ### 3.3. Quy trình một phiên phỏng vấn
 1. **Chờ ứng viên di chuyển:** Sau khi được gọi, trạng thái ứng viên chuyển thành "Đang di chuyển". 
@@ -84,7 +84,7 @@ Nút chế độ nằm trên thanh tiêu đề; bấm vào để chuyển qua l�
     - Nhập **Nhận xét chi tiết** vào khung chữ.
     - Chọn một trong ba quyết định: **Đạt**, **Cân nhắc thêm**, hoặc **Không đạt**.
 
-5. **Hoàn tất:** Bấm **HOÀN TẤT & LƯU**. Ứng viên này kết thúc và hệ thống tự động gọi ứng viên tiếp theo (nếu đang ở chế độ Tự động gọi).
+5. **Hoàn tất:** Bấm **HOÀN TẤT & LƯU**. Ứng viên này kết thúc; bàn trống lại và bạn gọi ứng viên tiếp theo.
 
 ### 3.4. Các chức năng hỗ trợ khác
 - **Tạm nghỉ:** Bấm **Tạm Nghỉ** trên thanh tiêu đề. Màn hình hiện *"Bàn đang đóng"* và hệ thống không gọi thêm ứng viên cho bạn. Bấm **Quay lại Bàn** để mở lại.

@@ -45,5 +45,6 @@
     ]
   },
 
-  "waitWarningMinutes": 30
+  "waitWarningMinutes": 30,
+  "autoAssign": true
 }
