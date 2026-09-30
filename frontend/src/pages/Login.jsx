@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { UserCircle, LogIn, ArrowRight, UserCheck, LayoutDashboard, Hash, Monitor, User, CheckCircle2 } from 'lucide-react';
 import MacBackground from '../components/MacBackground';
-import { switchRole, ROLE_LABELS } from '../lib/switchRole';
+import { switchRole, warnTableMates, ROLE_LABELS } from '../lib/switchRole';
 import { useOrgConfig } from '../orgConfig';
 
 // Fixed positions for the floating decoration images listed in org config `branding.decorations`
@@ -59,6 +59,7 @@ export default function Login() {
           roles: data.roles,
           token: data.token 
         }));
+        warnTableMates(data.tableMates);
         navigate('/interviewer');
       } else {
         setTempUser(data);
@@ -182,6 +183,7 @@ export default function Login() {
           autoAssign: data.autoAssign,
           token: data.token
         }));
+        warnTableMates(data.tableMates);
         navigate('/interviewer');
       } else {
         toast.error(data.message || "Lỗi khi xác nhận bàn!");

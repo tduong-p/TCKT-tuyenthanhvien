@@ -60,6 +60,11 @@ Nếu ứng viên không mang điện thoại hoặc không tự truy cập web 
 ### 3.1. Thiết lập vị trí
 - Ngay khi đăng nhập, hệ thống sẽ yêu cầu bạn nhập **Số Phòng** và **Số Bàn**. 
 - Hãy nhập chính xác vì đây là vị trí mà hệ thống sẽ chỉ đường cho ứng viên tìm đến bạn.
+- **Hai máy cùng một bàn** (ví dụ một máy chấm điểm, một máy xem hồ sơ): đăng nhập cả hai máy với cùng số phòng và số bàn, dùng chung một tài khoản hoặc hai tài khoản khác nhau. Hai máy thấy cùng một ứng viên, gọi hay huỷ ở máy nào cũng cập nhật sang máy kia.
+  - Khi vào một bàn đã có người, hệ thống báo *"Bàn này đã có: …"*, và thanh tiêu đề hiện dòng **Cùng bàn: …**.
+  - Mỗi ứng viên chỉ được chấm **một lần**: máy gửi sau sẽ nhận thông báo *"Ứng viên đã được chấm bởi …"*. Máy còn lại được báo *"… đã được chấm trên máy khác cùng bàn"* thay vì form tự biến mất.
+  - Chỉ chấm được ứng viên đang ở đúng bàn của mình.
+  - Một người **Rời bàn** hoặc đổi vai trò trong khi người kia vẫn ngồi thì ứng viên vẫn ở lại bàn; chỉ khi người cuối cùng rời bàn thì ứng viên mới được trả về hàng chờ.
 
 ### 3.2. Gọi ứng viên (2 Chế độ)
 - **Tự động gọi (Auto-assign):** Bật công tắc "Tự động gọi ứng viên". Cứ mỗi khi bàn của bạn trống, hệ thống sẽ tự động bốc ứng viên đang chờ lâu nhất vào bàn của bạn.

@@ -161,6 +161,12 @@ const assignCandidates = async () => {
 
 setInterval(assignCandidates, 3000); // Check every 3 seconds
 
+// Other interviewers seated at the same table (a table may have several devices/accounts)
+const findTableMates = (user) => (user.tableNumber && user.roomNumber)
+  ? User.find({ _id: { $ne: user._id }, role: 'interviewer', department: user.department, roomNumber: user.roomNumber, tableNumber: user.tableNumber })
+  : Promise.resolve([]);
+const mateNames = mates => mates.map(m => m.fullName || m.username);
+
 const onlineSockets = new Map();
 
 // Sockets may connect anonymously (TV / public board); actions below check socket.user
@@ -288,12 +294,14 @@ app.post('/api/login', async (req, res) => {
           return res.status(401).json({ success: false, message: 'Sai mật khẩu!' });
         }
 
+      let tableMates = [];
       if (user.role === 'interviewer') {
         if (tableNumber) user.tableNumber = String(tableNumber).trim();
         if (roomNumber) user.roomNumber = String(roomNumber).trim();
         user.status = 'active';
         await user.save();
         io.emit('staff_update');
+        tableMates = mateNames(await findTableMates(user));
       }
       
       const token = jwt.sign({ id: user._id, role: user.role, roles: user.roles, username: user.username }, JWT_SECRET, { expiresIn: '12h' });
@@ -307,6 +315,7 @@ app.post('/api/login', async (req, res) => {
         tableNumber: user.tableNumber,
         roomNumber: user.roomNumber,
         autoAssign: user.autoAssign,
+        tableMates,
         token
       });
     }
@@ -376,19 +385,32 @@ app.post('/api/evaluation', requireStaff('interviewer'), async (req, res) => {
     }
     const candidate = await Candidate.findOne({ interviewCode, department });
     if (!candidate) return res.status(404).json({ success: false, message: 'Không tìm thấy ứng viên' });
-    const averageScore = Math.round(scoreList.reduce((a, s) => a + s.score, 0) / scoreList.length * 10) / 10;
-    const evaluation = new Evaluation({
-      interviewCode, department, interviewerUsername, scores: scoreList, averageScore, notes, result
-    });
-    await evaluation.save();
-
-    await Candidate.updateOne(
-      { interviewCode, department }, 
-      { $set: { status: 'completed', interviewEndTime: new Date() } }
+    const me = req.staff;
+    // Claim atomically: with two devices at one table only the first submission is accepted
+    const claimed = await Candidate.findOneAndUpdate(
+      { _id: candidate._id, status: { $in: ['moving', 'interviewing'] }, assignedRoom: me.roomNumber, assignedTable: me.tableNumber },
+      { $set: { status: 'completed', interviewEndTime: new Date() } },
+      { returnDocument: 'before' }
     );
+    if (!claimed) {
+      const prev = await Evaluation.findOne({ interviewCode, department }).sort({ createdAt: -1 }).lean();
+      const by = prev && (await User.findOne({ username: prev.interviewerUsername }).lean());
+      const message = prev
+        ? `Ứng viên đã được chấm bởi ${(by && by.fullName) || prev.interviewerUsername}`
+        : 'Ứng viên không còn ở bàn của bạn';
+      return res.status(409).json({ success: false, message });
+    }
+    const averageScore = Math.round(scoreList.reduce((a, s) => a + s.score, 0) / scoreList.length * 10) / 10;
+    try {
+      await new Evaluation({ interviewCode, department, interviewerUsername, scores: scoreList, averageScore, notes, result }).save();
+    } catch (err) {
+      await Candidate.updateOne({ _id: candidate._id }, { $set: { status: claimed.status, interviewEndTime: claimed.interviewEndTime ?? null } });
+      throw err;
+    }
 
-    await User.updateOne(
-      { username: interviewerUsername },
+    // Free everyone at this table, not only the scorer
+    await User.updateMany(
+      { $or: [{ _id: me._id }, { role: 'interviewer', department: me.department, roomNumber: me.roomNumber, tableNumber: me.tableNumber, status: 'interviewing' }] },
       { $set: { status: 'active' } }
     );
 
@@ -403,7 +425,7 @@ app.post('/api/staff/leave', requireStaff(), async (req, res) => {
   try {
     const user = req.staff;
     // Bỏ gán ứng viên hiện tại nếu đang pv dở
-    if (user.tableNumber && user.roomNumber) {
+    if (user.tableNumber && user.roomNumber && (await findTableMates(user)).length === 0) {
       await Candidate.updateMany(
         { assignedTable: user.tableNumber, assignedRoom: user.roomNumber, department: user.department, status: { $in: ['moving', 'interviewing'] } },
         { $set: { status: 'waiting', assignedTable: null, assignedRoom: null, checkInTime: new Date(0) } }
@@ -693,9 +715,9 @@ app.post('/api/staff/switch-role', requireStaff(), async (req, res) => {
 
     if (user.role === 'interviewer' && targetRole !== 'interviewer') {
       // Leaving the interviewer seat: refuse mid-interview, otherwise free the table so auto-assign skips it
-      const busy = user.status === 'interviewing' || (user.tableNumber && user.roomNumber && await Candidate.exists({
+      const busy = (await findTableMates(user)).length === 0 && (user.status === 'interviewing' || (user.tableNumber && user.roomNumber && await Candidate.exists({
         assignedTable: user.tableNumber, assignedRoom: user.roomNumber, department: user.department, status: { $in: ['moving', 'interviewing'] },
-      }));
+      })));
       if (busy) return res.status(409).json({ success: false, message: 'Đang có ứng viên ở bàn, hãy hoàn tất trước khi đổi vai trò' });
       user.tableNumber = null;
       user.roomNumber = null;
@@ -711,7 +733,8 @@ app.post('/api/staff/switch-role', requireStaff(), async (req, res) => {
     io.emit('staff_update');
     io.emit('board_update');
     const newToken = jwt.sign({ id: user._id, role: user.role, roles: user.roles, username: user.username }, JWT_SECRET, { expiresIn: '12h' });
-    res.json({ success: true, role: user.role, tableNumber: user.tableNumber, roomNumber: user.roomNumber, token: newToken });
+    const tableMates = user.role === 'interviewer' ? mateNames(await findTableMates(user)) : [];
+    res.json({ success: true, role: user.role, tableNumber: user.tableNumber, roomNumber: user.roomNumber, tableMates, token: newToken });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

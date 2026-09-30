@@ -23,6 +23,10 @@ export default function InterviewerView() {
   const [currentCandidate, setCurrentCandidate] = useState(null);
   const [isBreak, setIsBreak] = useState(false);
   const socketRef = useRef(null);
+  // Another device at this table may score or cancel our candidate: tell the user instead of silently clearing the form
+  const shownCodeRef = useRef(null);
+  const selfDoneRef = useRef(null);
+  const [tableMates, setTableMates] = useState([]);
 
   // Form states
   const [scores, setScores] = useState(defaultScores);
@@ -45,6 +49,10 @@ export default function InterviewerView() {
     socketRef.current.on('board_update', () => {
       if (stored) fetchBoard();
     });
+    socketRef.current.on('staff_update', () => {
+      if (stored) fetchTableMates();
+    });
+    if (stored && stored.role === 'interviewer') fetchTableMates();
 
     return () => socketRef.current.disconnect();
   }, []);
@@ -68,7 +76,32 @@ export default function InterviewerView() {
         (c.status === 'moving' || c.status === 'interviewing')
       );
       
+      const prev = shownCodeRef.current;
+      if (prev && (!candidate || candidate.interviewCode !== prev)) {
+        if (selfDoneRef.current !== prev) {
+          const done = (data.completed || []).find(c => c.interviewCode === prev);
+          const name = getCandidateName(done || all.find(c => c.interviewCode === prev)) || prev;
+          toast(done ? `Ứng viên ${name} đã được chấm trên máy khác cùng bàn` : `Lượt của ${name} đã bị huỷ trên máy khác cùng bàn`, { icon: 'ℹ️', duration: 6000 });
+        }
+        selfDoneRef.current = null;
+        setScores(defaultScores()); setNotes(''); setResult(results[0].value);
+      }
+      shownCodeRef.current = candidate ? candidate.interviewCode : null;
       setCurrentCandidate(candidate || null);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const fetchTableMates = async () => {
+    try {
+      const me = JSON.parse(localStorage.getItem('user'));
+      if (!me) return;
+      const res = await fetch('/api/staff');
+      if (!res.ok) return;
+      const staff = await res.json();
+      setTableMates(staff.filter(u => u.username !== me.username && u.role === 'interviewer' && u.department === me.department
+        && u.roomNumber === me.roomNumber && u.tableNumber === me.tableNumber).map(u => u.fullName || u.username));
     } catch (e) {
       console.error(e);
     }
@@ -159,6 +192,7 @@ export default function InterviewerView() {
       });
       if (!confirmResult.isConfirmed) return;
 
+    selfDoneRef.current = currentCandidate.interviewCode;
     try {
       const res = await fetch('/api/interviewer/cancel', {
         method: 'POST',
@@ -190,6 +224,7 @@ export default function InterviewerView() {
       result
     };
     
+    selfDoneRef.current = currentCandidate.interviewCode;
     const res = await fetch('/api/evaluation', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -255,6 +290,7 @@ export default function InterviewerView() {
                     {user.roomNumber ? `P.${user.roomNumber} - ` : ''}Bàn {user.tableNumber}
                   </h1>
                   <p className="text-blue-200 text-sm mt-1 font-medium">Interviewer: {user.fullName || user.username}</p>
+                  {tableMates.length > 0 && <p className="text-amber-200 text-sm font-bold">Cùng bàn: {tableMates.join(', ')}</p>}
                 </div>
               </div>
               
