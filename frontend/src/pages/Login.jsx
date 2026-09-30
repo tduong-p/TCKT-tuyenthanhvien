@@ -190,7 +190,7 @@ export default function Login() {
   };
 
   return (
-    <div className="flex-1 w-full flex flex-col items-center justify-center bg-slate-50 p-4 font-sans relative overflow-x-hidden overflow-y-auto py-8">
+    <div className="flex-1 w-full flex flex-col items-center justify-center bg-slate-50 p-4 font-sans relative overflow-x-hidden overflow-y-auto py-4">
       <MacBackground />
 
       {/* Floating decorations */}
@@ -202,17 +202,17 @@ export default function Login() {
 
       {/* Department title images */}
       {titleDepartments.length > 0 && (
-        <div className="z-10 flex flex-row items-center justify-center gap-2 md:gap-8 mb-6 md:mb-12 w-full px-4 max-w-2xl">
+        <div className="z-10 flex flex-row items-center justify-center gap-2 md:gap-8 mb-4 md:mb-6 w-full px-4 max-w-2xl">
           {titleDepartments.map((d, i) => (
             <React.Fragment key={d.code}>
               {i > 0 && <span className="text-3xl md:text-7xl font-black text-white/70 drop-shadow-md animate-fade-in">&amp;</span>}
-              <img src={d.titleImage} alt={d.name} className="flex-1 min-w-0 max-w-[24rem] lg:max-w-[32rem] object-contain drop-shadow-2xl transform animate-fade-in-up" />
+              <img src={d.titleImage} alt={d.name} className="flex-1 min-w-0 max-w-[24rem] lg:max-w-[32rem] max-h-[28vh] object-contain drop-shadow-2xl transform animate-fade-in-up" />
             </React.Fragment>
           ))}
         </div>
       )}
 
-      <div className="bg-white/90 backdrop-blur-2xl p-8 md:p-10 rounded-[2rem] shadow-[0_0_50px_rgba(0,0,0,0.1)] w-full max-w-md border border-white z-10 animate-fade-in-up mb-12">
+      <div className="bg-white/90 backdrop-blur-2xl p-8 md:p-10 rounded-[2rem] shadow-[0_0_50px_rgba(0,0,0,0.1)] w-full max-w-md border border-white z-10 animate-fade-in-up">
         
         <form onSubmit={handleLogin} className="space-y-5">
           {step === 1 && (
