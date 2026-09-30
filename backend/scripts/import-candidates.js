@@ -4,13 +4,14 @@
 //
 // Every column of the row is kept as applicationData (shown to interviewers).
 // Existing candidates (same code + department) are updated, their interview status is kept.
-// --replace first deletes every candidate of that department.
+// --replace also deletes candidates of that department missing from the file; refused once
+// anyone of that department has checked in or been evaluated.
 const mongoose = require('mongoose');
 const xlsx = require('xlsx');
 const fs = require('fs');
 require('dotenv').config();
 const { config, isValidDepartment, departmentCodes } = require('../config');
-const Candidate = require('../models/Candidate');
+const { plan, apply } = require('../importers/candidates');
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -46,39 +47,12 @@ async function run() {
     throw new Error(`Column "${codeColumn}" not found. Columns: ${Object.keys(rows[0]).join(', ')}\nUse --code-column to pick the candidate code column.`);
   }
 
-  // Later rows win (a candidate who re-submitted the form keeps their latest answers)
-  const byCode = new Map();
-  let skipped = 0;
-  for (const row of rows) {
-    const code = String(row[codeColumn]).trim().toUpperCase(); // login upper-cases the code
-    if (!code) { skipped++; continue; }
-    const data = {};
-    for (const [k, v] of Object.entries(row)) {
-      let value = v instanceof Date ? v.toISOString() : String(v).trim();
-      // Excel drops the leading 0 of phone numbers stored as numbers
-      if (config.candidate.phoneFields.includes(k) && /^\d{8,}$/.test(value) && !value.startsWith('0')) value = '0' + value;
-      if (value !== '') data[k] = value;
-    }
-    byCode.set(code, data);
-  }
-
   await mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/interview');
-
-  if (args.replace) {
-    const { deletedCount } = await Candidate.deleteMany({ department });
-    console.log(`Deleted ${deletedCount} existing candidates of ${department}.`);
-  }
-
-  let created = 0, updated = 0;
-  for (const [interviewCode, applicationData] of byCode) {
-    const res = await Candidate.updateOne(
-      { interviewCode, department },
-      { $set: { applicationData }, $setOnInsert: { status: 'active' } },
-      { upsert: true }
-    );
-    if (res.upsertedCount) created++; else updated++;
-  }
-  console.log(`${department}: ${created} created, ${updated} updated, ${skipped} rows skipped (empty ${codeColumn}).`);
+  const p = await plan({ department, codeColumn, rows, replace: !!args.replace });
+  if (p.error) { await mongoose.disconnect(); throw new Error(p.error); }
+  const { created, updated, removed } = await apply(department, p);
+  if (args.replace) console.log(`Deleted ${removed} candidates of ${department} not in the file.`);
+  console.log(`${department}: ${created} created, ${updated + p.unchanged} updated, ${p.skipped.length} rows skipped (empty ${codeColumn}).`);
   await mongoose.disconnect();
 }
 
