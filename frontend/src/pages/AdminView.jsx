@@ -3,13 +3,15 @@ import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, LayoutDashboard, Users, AlertTriangle, Download, Clock, ShieldCheck, FileText, RefreshCw, Hash, Trash2, List } from 'lucide-react';
+import { LogOut, LayoutDashboard, Users, AlertTriangle, Download, Clock, ShieldCheck, FileText, RefreshCw, Hash, Trash2, List, Upload } from 'lucide-react';
 import { createSocket } from '../socket';
 import Board from './Board';
 import ChatWidget from '../components/ChatWidget';
 import MacBackground from '../components/MacBackground';
 import MacWindow from '../components/MacWindow';
 import { useOrgConfig } from '../orgConfig';
+import ImportModal from '../components/ImportModal';
+import { downloadXlsx, stamp } from '../lib/excel';
 
 export default function AdminView() {
   const navigate = useNavigate();
@@ -78,6 +80,7 @@ export default function AdminView() {
   const user = JSON.parse(localStorage.getItem('user')) || {};
   const isSuperAdmin = user.role === 'admin' || (user.roles && user.roles.includes('admin'));
   const [viewDepartment, setViewDepartment] = useState(user.department || defaultDepartment);
+  const [importKind, setImportKind] = useState(null); // 'candidates' | 'staff' while the import modal is open
 
   useEffect(() => {
     socketRef.current = createSocket();
@@ -210,6 +213,35 @@ export default function AdminView() {
       toast.error(data.error || 'Có lỗi xảy ra');
     }
   };
+
+  const handleExport = async (kind) => {
+    try {
+      const url = kind === 'candidates' ? `/api/admin/export/candidates?department=${encodeURIComponent(viewDepartment)}` : '/api/admin/export/staff';
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!res.ok) return toast.error(data.message || 'Xuất thất bại');
+      const name = kind === 'candidates' ? `ung-vien-${viewDepartment}-${stamp()}.xlsx` : `nhan-su-${stamp()}.xlsx`;
+      downloadXlsx(name, data.columns, data.rows);
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const toggleNewUserRole = (role) => {
+    const roles = newUser.roles.includes(role) ? newUser.roles.filter(r => r !== role) : [...newUser.roles, role];
+    if (roles.length) setNewUser({ ...newUser, roles });
+  };
+
+  const renderIoButtons = (kind) => (
+    <div className="flex gap-2">
+      <button onClick={() => setImportKind(kind)} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-xl shadow-md transition-colors text-sm">
+        <Upload size={16} /> Nhập Excel
+      </button>
+      <button onClick={() => handleExport(kind)} className="flex items-center gap-2 bg-slate-700 hover:bg-slate-800 text-white font-bold py-2 px-4 rounded-xl shadow-md transition-colors text-sm">
+        <Download size={16} /> Xuất Excel
+      </button>
+    </div>
+  );
 
   const handleAddUser = async () => {
     if (!newUser.username) return toast.error('Vui lòng nhập tài khoản');
@@ -704,7 +736,10 @@ export default function AdminView() {
 
           {activeTab === 'users' && isSuperAdmin && (
             <div className="bg-white/80 backdrop-blur-md rounded-[2rem] shadow-xl border border-white/50 p-8 animate-fade-in-up">
-              <h2 className="text-3xl font-black text-slate-800 tracking-tight mb-8 border-b border-slate-100 pb-6">Quản Lý Nhân Sự</h2>
+              <div className="flex flex-wrap items-center justify-between gap-4 mb-8 border-b border-slate-100 pb-6">
+                <h2 className="text-3xl font-black text-slate-800 tracking-tight">Quản Lý Nhân Sự</h2>
+                {renderIoButtons('staff')}
+              </div>
               
               {/* Add New User */}
               <div className="bg-slate-50 border border-slate-200 p-6 rounded-2xl mb-8">
@@ -724,6 +759,16 @@ export default function AdminView() {
                       {departments.map(d => <option key={d.code} value={d.code}>{d.shortName}</option>)}
                     </select>
                   </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-600 mb-1">Vai trò</label>
+                    <div className="flex gap-3 h-[42px] items-center">
+                      {[['interviewer', 'Phỏng vấn'], ['receptionist', 'Lễ tân'], ['admin', 'Admin']].map(([r, name]) => (
+                        <label key={r} className="flex items-center gap-1 text-sm font-medium text-slate-700">
+                          <input type="checkbox" checked={newUser.roles.includes(r)} onChange={() => toggleNewUserRole(r)} /> {name}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                   <button onClick={handleAddUser} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-xl shadow-md transition-colors h-[42px]">Thêm</button>
                 </div>
               </div>
@@ -735,7 +780,10 @@ export default function AdminView() {
           )}
           {activeTab === 'candidates' && isSuperAdmin && (
             <div className="bg-white/80 backdrop-blur-md rounded-[2rem] shadow-xl border border-white/50 p-8 animate-fade-in-up">
-              <h2 className="text-3xl font-black text-slate-800 tracking-tight mb-8 border-b border-slate-100 pb-6">Danh Sách Ứng Viên</h2>
+              <div className="flex flex-wrap items-center justify-between gap-4 mb-8 border-b border-slate-100 pb-6">
+                <h2 className="text-3xl font-black text-slate-800 tracking-tight">Danh Sách Ứng Viên</h2>
+                {renderIoButtons('candidates')}
+              </div>
               
               {/* Add New Candidate */}
               <div className="bg-slate-50 border border-slate-200 p-6 rounded-2xl mb-8">
@@ -798,6 +846,16 @@ export default function AdminView() {
         </div>
       </MacWindow>
       <ChatWidget currentUser={user} />
+      <ImportModal
+        key={importKind || 'closed'}
+        kind={importKind}
+        open={!!importKind}
+        onClose={() => setImportKind(null)}
+        onDone={() => (importKind === 'staff' ? fetchUsers() : fetchCandidates())}
+        departments={departments}
+        defaultDepartment={viewDepartment}
+        codeLabel={codeLabel}
+      />
 
       {/* Role Switch Modal */}
       {showTablePrompt && (

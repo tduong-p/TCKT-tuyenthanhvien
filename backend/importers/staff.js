@@ -13,7 +13,8 @@ const pickRole = (roles, current) => (current && roles.includes(current) ? curre
 // actor: username of the admin running the import; they can neither lose admin nor be removed.
 async function plan({ rows, removeMissing = false, actor = null, strict = false }) {
   const skipped = [];
-  const reject = (line, reason) => { if (strict) throw new Error(`Line ${line}: ${reason}`); skipped.push({ line, reason }); };
+  // The CLI keeps its English messages; the web preview shows Vietnamese ones
+  const reject = (line, en, vi) => { if (strict) throw new Error(`Line ${line}: ${en}`); skipped.push({ line, reason: vi }); };
 
   const byName = new Map(); // later rows win
   rows.forEach((row, i) => {
@@ -21,11 +22,11 @@ async function plan({ rows, removeMissing = false, actor = null, strict = false 
     const username = String(row.username ?? '').trim();
     if (!username) { if (!strict) skipped.push({ line, reason: 'thiếu username' }); return; }
     const department = String(row.department ?? '').trim() || defaultDepartment;
-    if (!isValidDepartment(department)) return reject(line, `unknown department "${department}" (configured: ${departmentCodes.join(', ')})`);
+    if (!isValidDepartment(department)) return reject(line, `unknown department "${department}" (configured: ${departmentCodes.join(', ')})`, `ban không hợp lệ "${department}" (có: ${departmentCodes.join(', ')})`);
     const roles = String(row.roles ?? '').split(',').map(r => r.trim().toLowerCase()).filter(Boolean);
     if (!roles.length) roles.push('interviewer');
     const bad = roles.filter(r => !VALID_ROLES.includes(r));
-    if (bad.length) return reject(line, `unknown role(s) ${bad.join(', ')} (allowed: ${VALID_ROLES.join(', ')})`);
+    if (bad.length) return reject(line, `unknown role(s) ${bad.join(', ')} (allowed: ${VALID_ROLES.join(', ')})`, `vai trò không hợp lệ: ${bad.join(', ')} (chỉ có: ${VALID_ROLES.join(', ')})`);
     if (actor && username === actor && !roles.includes('admin')) {
       skipped.push({ line, reason: 'không thể tự bỏ quyền admin của chính mình' });
       return;

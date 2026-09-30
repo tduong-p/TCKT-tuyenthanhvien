@@ -35,11 +35,11 @@ const sameData = (a = {}, b = {}) => {
 
 async function plan({ department, codeColumn = config.candidate.codeLabel, rows, replace = false }) {
   if (!isValidDepartment(department)) {
-    return { error: `Unknown department "${department}". Configured: ${departmentCodes.join(', ')}`, status: 400 };
+    return { error: `Ban không hợp lệ "${department}" (Unknown department). Có: ${departmentCodes.join(', ')}`, status: 400 };
   }
-  if (!Array.isArray(rows) || rows.length === 0) return { error: 'Sheet is empty', status: 400 };
+  if (!Array.isArray(rows) || rows.length === 0) return { error: 'File không có dòng dữ liệu nào (Sheet is empty)', status: 400 };
   if (!(codeColumn in rows[0])) {
-    return { error: `Column "${codeColumn}" not found. Columns: ${Object.keys(rows[0]).join(', ')}`, status: 400 };
+    return { error: `Không có cột "${codeColumn}" (Column "${codeColumn}" not found). Các cột: ${Object.keys(rows[0]).join(', ')}`, status: 400 };
   }
 
   const { byCode, skipped } = normalizeRows(rows, codeColumn);
